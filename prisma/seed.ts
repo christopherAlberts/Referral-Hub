@@ -105,6 +105,7 @@ const fictionalTherapists = [
 
 async function main() {
   await prisma.reminderLog.deleteMany();
+  await prisma.notificationAlert.deleteMany();
   await prisma.dailyAvailability.deleteMany();
   await prisma.pushSubscription.deleteMany();
   await prisma.therapistProfile.deleteMany();
@@ -115,9 +116,26 @@ async function main() {
     data: {
       id: "default",
       notifyEnabled: true,
-      notifyTimeLocal: "08:00",
-      frequency: NotifyFrequency.DAILY,
     },
+  });
+
+  await prisma.notificationAlert.createMany({
+    data: [
+      {
+        label: "Morning check-in",
+        timeLocal: "08:00",
+        frequency: NotifyFrequency.DAILY,
+        enabled: true,
+        sortOrder: 0,
+      },
+      {
+        label: "Midday reminder",
+        timeLocal: "12:00",
+        frequency: NotifyFrequency.WEEKDAYS,
+        enabled: true,
+        sortOrder: 1,
+      },
+    ],
   });
 
   await prisma.user.create({

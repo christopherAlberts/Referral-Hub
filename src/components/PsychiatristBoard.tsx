@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { CapacityStatus } from "@prisma/client";
 import { TherapistBubble, type TherapistBoardItem } from "@/components/TherapistBubble";
+import { initials } from "@/lib/utils";
 
 type StatusFilter = "ALL" | CapacityStatus | "NONE";
 type SortDir = "asc" | "desc";
-type ViewMode = "three" | "one";
+type ViewMode = "table" | "three" | "one";
 
 export function PsychiatristBoard() {
   const [therapists, setTherapists] = useState<TherapistBoardItem[]>([]);
@@ -15,7 +16,7 @@ export function PsychiatristBoard() {
   const [sort, setSort] = useState<SortDir>("asc");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [specialty, setSpecialty] = useState("ALL");
-  const [view, setView] = useState<ViewMode>("three");
+  const [view, setView] = useState<ViewMode>("table");
 
   async function load() {
     const res = await fetch("/api/availability", { cache: "no-store" });
@@ -84,6 +85,9 @@ export function PsychiatristBoard() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
+            <button className="chip" data-active={view === "table" ? "true" : "false"} onClick={() => setView("table")}>
+              Table
+            </button>
             <button className="chip" data-active={view === "three" ? "true" : "false"} onClick={() => setView("three")}>
               3 columns
             </button>
@@ -138,6 +142,8 @@ export function PsychiatristBoard() {
 
       {loading ? (
         <p className="text-[var(--muted)]">Loading board…</p>
+      ) : view === "table" ? (
+        <CapacityTable therapists={filtered} />
       ) : view === "three" ? (
         <div className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-3">
@@ -183,6 +189,114 @@ export function PsychiatristBoard() {
         </div>
       )}
     </div>
+  );
+}
+
+function CapacityTable({ therapists }: { therapists: TherapistBoardItem[] }) {
+  if (therapists.length === 0) {
+    return <p className="text-[var(--muted)]">No therapists match these filters.</p>;
+  }
+
+  return (
+    <div className="glass column-in overflow-hidden rounded-[28px]">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-[var(--line)] bg-white/50 text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
+              <th className="px-4 py-3.5 font-semibold sm:px-5">Psychologist</th>
+              <th className="px-3 py-3.5 text-center font-semibold" style={{ color: "var(--green)" }}>
+                Available
+              </th>
+              <th className="px-3 py-3.5 text-center font-semibold" style={{ color: "var(--amber)" }}>
+                Some capacity
+              </th>
+              <th className="px-3 py-3.5 text-center font-semibold" style={{ color: "var(--red)" }}>
+                No capacity
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {therapists.map((t, i) => {
+              const status = t.availability?.status ?? null;
+              const slots = t.availability?.slots;
+              return (
+                <tr
+                  key={t.id}
+                  className="rise-in border-b border-[var(--line)] last:border-b-0"
+                  style={{ animationDelay: `${i * 35}ms` }}
+                >
+                  <td className="px-4 py-3 sm:px-5">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
+                        style={{ background: "var(--ink)" }}
+                      >
+                        {t.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={t.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          initials(t.name)
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-[var(--ink)]">{t.name}</p>
+                        <p className="truncate text-xs text-[var(--muted)]">{t.specialty ?? "Therapist"}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <StatusCell
+                    active={status === CapacityStatus.AVAILABLE}
+                    tone="green"
+                    value={status === CapacityStatus.AVAILABLE ? String(slots ?? "✓") : null}
+                  />
+                  <StatusCell
+                    active={status === CapacityStatus.SOME_CAPACITY}
+                    tone="amber"
+                    value={status === CapacityStatus.SOME_CAPACITY ? String(slots ?? "✓") : null}
+                  />
+                  <StatusCell
+                    active={status === CapacityStatus.NO_CAPACITY}
+                    tone="red"
+                    value={status === CapacityStatus.NO_CAPACITY ? "—" : null}
+                  />
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StatusCell({
+  active,
+  tone,
+  value,
+}: {
+  active: boolean;
+  tone: "green" | "amber" | "red";
+  value: string | null;
+}) {
+  const styles = {
+    green: { bg: "var(--green-soft)", ink: "var(--green)" },
+    amber: { bg: "var(--amber-soft)", ink: "var(--amber)" },
+    red: { bg: "var(--red-soft)", ink: "var(--red)" },
+  }[tone];
+
+  return (
+    <td className="px-3 py-3 text-center align-middle">
+      {active ? (
+        <span
+          className="inline-flex min-w-[3rem] items-center justify-center rounded-full px-3 py-1.5 text-sm font-bold"
+          style={{ background: styles.bg, color: styles.ink }}
+        >
+          {value}
+        </span>
+      ) : (
+        <span className="text-sm text-[var(--muted)]/40">·</span>
+      )}
+    </td>
   );
 }
 

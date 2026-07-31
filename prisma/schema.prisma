@@ -36,10 +36,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  therapistProfile   TherapistProfile?
-  pushSubscriptions  PushSubscription[]
+  therapistProfile    TherapistProfile?
+  pushSubscriptions   PushSubscription[]
   dailyAvailabilities DailyAvailability[]
-  reminderLogs       ReminderLog[]
+  reminderLogs        ReminderLog[]
 }
 
 model TherapistProfile {
@@ -78,19 +78,33 @@ model PushSubscription {
 }
 
 model AppSettings {
-  id              String          @id @default("default")
-  notifyEnabled   Boolean         @default(true)
-  notifyTimeLocal String          @default("08:00")
-  frequency       NotifyFrequency @default(DAILY)
-  updatedAt       DateTime        @updatedAt
+  id               String    @id @default("default")
+  notifyEnabled    Boolean   @default(true)
+  lastBroadcastAt  DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
+model NotificationAlert {
+  id        String          @id @default(cuid())
+  label     String
+  timeLocal String
+  frequency NotifyFrequency @default(DAILY)
+  enabled   Boolean         @default(true)
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  reminders ReminderLog[]
 }
 
 model ReminderLog {
   id        String   @id @default(cuid())
   userId    String
+  alertId   String
   date      DateTime @db.Date
   sentAt    DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alert     NotificationAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, date])
+  @@unique([userId, alertId, date])
+  @@index([alertId, date])
 }

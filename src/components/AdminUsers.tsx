@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Role } from "@prisma/client";
 import { COMMON_TIMEZONES } from "@/lib/timezone";
 import { statusLabel } from "@/lib/utils";
@@ -22,6 +22,10 @@ type UserRow = {
   } | null;
 };
 
+type RoleFilter = "ALL" | Role;
+type ActiveFilter = "ALL" | "ACTIVE" | "INACTIVE";
+type PushFilter = "ALL" | "ON" | "OFF";
+
 const emptyForm = {
   email: "",
   name: "",
@@ -38,6 +42,10 @@ export function AdminUsers() {
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("ALL");
+  const [pushFilter, setPushFilter] = useState<PushFilter>("ALL");
 
   async function load() {
     const res = await fetch("/api/users");
@@ -49,6 +57,26 @@ export function AdminUsers() {
   useEffect(() => {
     load();
   }, []);
+
+  const filtered = useMemo(() => {
+    let rows = [...users];
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      rows = rows.filter(
+        (u) =>
+          u.name.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q) ||
+          (u.specialty ?? "").toLowerCase().includes(q) ||
+          u.timezone.toLowerCase().includes(q),
+      );
+    }
+    if (roleFilter !== "ALL") rows = rows.filter((u) => u.role === roleFilter);
+    if (activeFilter === "ACTIVE") rows = rows.filter((u) => u.active);
+    if (activeFilter === "INACTIVE") rows = rows.filter((u) => !u.active);
+    if (pushFilter === "ON") rows = rows.filter((u) => u.pushEnabled);
+    if (pushFilter === "OFF") rows = rows.filter((u) => !u.pushEnabled);
+    return rows;
+  }, [users, query, roleFilter, activeFilter, pushFilter]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -62,7 +90,7 @@ export function AdminUsers() {
     setBusy(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setMessage(data.error?.toString?.() ?? "Could not create user");
+      setMessage(typeof data.error === "string" ? data.error : "Could not create user");
       return;
     }
     setForm(emptyForm);
@@ -160,34 +188,123 @@ export function AdminUsers() {
         </div>
       </form>
 
+      <section className="glass space-y-4 rounded-[28px] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="field max-w-md flex-1">
+            <label htmlFor="user-search">Search users</label>
+            <input
+              id="user-search"
+              placeholder="Name, email, specialty, timezone…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <p className="text-sm text-[var(--muted)]">
+            Showing {filtered.length} of {users.length}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["ALL", "All roles"],
+              [Role.THERAPIST, "Therapists"],
+              [Role.PSYCHIATRIST, "Psychiatrists"],
+              [Role.ADMIN, "Admins"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className="chip"
+              data-active={roleFilter === value ? "true" : "false"}
+              onClick={() => setRoleFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["ALL", "All status"],
+              ["ACTIVE", "Active"],
+              ["INACTIVE", "Inactive"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className="chip"
+              data-active={activeFilter === value ? "true" : "false"}
+              onClick={() => setActiveFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+          {(
+            [
+              ["ALL", "All push"],
+              ["ON", "Push on"],
+              ["OFF", "Push off"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className="chip"
+              data-active={pushFilter === value ? "true" : "false"}
+              onClick={() => setPushFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="space-y-3">
-        {users.map((user) => (
-          <article key={user.id} className="glass rounded-[22px] p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-[var(--muted)]">{user.email}</p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-[var(--muted)]">
-                  {user.role} · {user.timezone}
-                  {user.specialty ? ` · ${user.specialty}` : ""}
-                </p>
+        {filtered.length === 0 ? (
+          <p className="glass rounded-[22px] p-4 text-sm text-[var(--muted)]">
+            No users match these filters.
+          </p>
+        ) : (
+          filtered.map((user) => (
+            <article
+              key={user.id}
+              className="glass rounded-[22px] p-4"
+              style={{ opacity: user.active ? 1 : 0.65 }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{user.name}</p>
+                  <p className="text-sm text-[var(--muted)]">{user.email}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-[var(--muted)]">
+                    {user.role} · {user.timezone}
+                    {user.specialty ? ` · ${user.specialty}` : ""}
+                    {!user.active ? " · inactive" : ""}
+                  </p>
+                </div>
+                <div className="text-right text-sm">
+                  <p className={user.pushEnabled ? "text-[var(--green)]" : "text-[var(--muted)]"}>
+                    {user.pushEnabled ? "Push on" : "Push off"}
+                  </p>
+                  <p className="text-[var(--muted)]">
+                    {user.lastAvailability
+                      ? `${statusLabel(user.lastAvailability.status as never)} (${user.lastAvailability.slots ?? "—"})`
+                      : "No capacity yet"}
+                  </p>
+                  <button
+                    className="btn btn-secondary mt-2 !py-1.5 text-xs"
+                    onClick={() => toggleActive(user)}
+                  >
+                    {user.active ? "Deactivate" : "Activate"}
+                  </button>
+                </div>
               </div>
-              <div className="text-right text-sm">
-                <p className={user.pushEnabled ? "text-[var(--green)]" : "text-[var(--muted)]"}>
-                  {user.pushEnabled ? "Push on" : "Push off"}
-                </p>
-                <p className="text-[var(--muted)]">
-                  {user.lastAvailability
-                    ? `${statusLabel(user.lastAvailability.status as never)} (${user.lastAvailability.slots ?? "—"})`
-                    : "No capacity yet"}
-                </p>
-                <button className="btn btn-secondary mt-2 !py-1.5 text-xs" onClick={() => toggleActive(user)}>
-                  {user.active ? "Deactivate" : "Activate"}
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          ))
+        )}
       </section>
     </div>
   );
