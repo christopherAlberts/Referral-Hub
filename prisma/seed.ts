@@ -10,6 +10,81 @@ async function hash(password: string) {
   return bcrypt.hash(password, 10);
 }
 
+const famousTherapists = [
+  {
+    name: "Sigmund Freud",
+    email: "sigmund.freud@referralhub.test",
+    specialty: "Psychoanalysis",
+    bio: "Founder of psychoanalysis; explores the unconscious through free association and dream work.",
+    phone: "+43-1-555-0201",
+    status: CapacityStatus.SOME_CAPACITY,
+    slots: 1,
+  },
+  {
+    name: "Carl Jung",
+    email: "carl.jung@referralhub.test",
+    specialty: "Analytical Psychology",
+    bio: "Depth psychologist focused on archetypes, individuation, and the collective unconscious.",
+    phone: "+41-61-555-0202",
+    status: CapacityStatus.AVAILABLE,
+    slots: 3,
+  },
+  {
+    name: "Carl Rogers",
+    email: "carl.rogers@referralhub.test",
+    specialty: "Person-Centered Therapy",
+    bio: "Humanistic clinician emphasizing empathy, congruence, and unconditional positive regard.",
+    phone: "+1-312-555-0203",
+    status: CapacityStatus.AVAILABLE,
+    slots: 4,
+  },
+  {
+    name: "Virginia Satir",
+    email: "virginia.satir@referralhub.test",
+    specialty: "Family Systems Therapy",
+    bio: "Pioneer of family therapy known for transforming communication patterns in families.",
+    phone: "+1-415-555-0204",
+    status: CapacityStatus.SOME_CAPACITY,
+    slots: 2,
+  },
+  {
+    name: "Irvin Yalom",
+    email: "irvin.yalom@referralhub.test",
+    specialty: "Existential Psychotherapy",
+    bio: "Group and existential therapist exploring meaning, mortality, and authentic connection.",
+    phone: "+1-650-555-0205",
+    status: CapacityStatus.AVAILABLE,
+    slots: 2,
+  },
+  {
+    name: "Aaron Beck",
+    email: "aaron.beck@referralhub.test",
+    specialty: "Cognitive Behavioral Therapy",
+    bio: "Developer of CBT; helps clients identify and reframe unhelpful thought patterns.",
+    phone: "+1-215-555-0206",
+    status: CapacityStatus.SOME_CAPACITY,
+    slots: 1,
+  },
+  {
+    name: "Viktor Frankl",
+    email: "viktor.frankl@referralhub.test",
+    specialty: "Logotherapy",
+    bio: "Existential therapist focused on finding meaning even in difficult circumstances.",
+    phone: "+43-1-555-0207",
+    status: CapacityStatus.AVAILABLE,
+    slots: 3,
+  },
+  {
+    name: "Fritz Perls",
+    email: "fritz.perls@referralhub.test",
+    specialty: "Gestalt Therapy",
+    bio: "Gestalt practitioner emphasizing awareness, present-moment experience, and ownership.",
+    phone: "+1-212-555-0208",
+    status: CapacityStatus.NO_CAPACITY,
+    slots: null,
+  },
+];
+
 const fictionalTherapists = [
   {
     name: "Dr. Frasier Crane",
@@ -103,6 +178,8 @@ const fictionalTherapists = [
   },
 ];
 
+const seedTherapists = [...famousTherapists, ...fictionalTherapists];
+
 async function main() {
   await prisma.reminderLog.deleteMany();
   await prisma.notificationAlert.deleteMany();
@@ -117,6 +194,7 @@ async function main() {
     data: {
       id: "default",
       notifyEnabled: true,
+      notifyBody: "Hi {{name}} — please update today’s patient capacity.",
     },
   });
 
@@ -200,7 +278,7 @@ async function main() {
     },
   });
 
-  for (const t of fictionalTherapists) {
+  for (const t of seedTherapists) {
     const user = await prisma.user.create({
       data: {
         email: t.email,

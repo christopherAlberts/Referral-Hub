@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["referralhub.streblainnovations.com"],
+  // Hide the Next.js Dev Tools indicator in development
+  devIndicators: false,
   headers: async () => [
     {
       source: "/sw.js",

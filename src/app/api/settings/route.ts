@@ -3,6 +3,7 @@ import { NotifyFrequency, Role } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { DEFAULT_NOTIFY_BODY } from "@/lib/notify";
 import { nextAlertOccurrence, SCHEDULE_DISPLAY_TZ } from "@/lib/timezone";
 
 const alertSchema = z.object({
@@ -15,7 +16,8 @@ const alertSchema = z.object({
 });
 
 const schema = z.object({
-  alerts: z.array(alertSchema).min(0).max(20),
+  alerts: z.array(alertSchema).min(0).max(20).optional(),
+  notifyBody: z.string().min(1).max(280).optional(),
 });
 
 async function buildSettingsPayload() {
@@ -72,6 +74,7 @@ async function buildSettingsPayload() {
 
   return {
     ...settings,
+    notifyBody: settings.notifyBody || DEFAULT_NOTIFY_BODY,
     lastBroadcastAt: settings.lastBroadcastAt?.toISOString() ?? null,
     lastSentAt: lastSentAt?.toISOString() ?? null,
     nextScheduledAt: upcoming[0] ?? null,
@@ -102,45 +105,54 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { alerts } = parsed.data;
+  const { alerts, notifyBody } = parsed.data;
 
   await prisma.appSettings.upsert({
     where: { id: "default" },
-    create: { id: "default", notifyEnabled: true },
-    update: { notifyEnabled: true },
+    create: {
+      id: "default",
+      notifyEnabled: true,
+      notifyBody: notifyBody?.trim() || DEFAULT_NOTIFY_BODY,
+    },
+    update: {
+      notifyEnabled: true,
+      ...(notifyBody !== undefined ? { notifyBody: notifyBody.trim() || DEFAULT_NOTIFY_BODY } : {}),
+    },
   });
 
-  const existing = await prisma.notificationAlert.findMany({ select: { id: true } });
-  const keepIds = new Set(alerts.map((a) => a.id).filter(Boolean) as string[]);
-  const toDelete = existing.filter((a) => !keepIds.has(a.id)).map((a) => a.id);
+  if (alerts !== undefined) {
+    const existing = await prisma.notificationAlert.findMany({ select: { id: true } });
+    const keepIds = new Set(alerts.map((a) => a.id).filter(Boolean) as string[]);
+    const toDelete = existing.filter((a) => !keepIds.has(a.id)).map((a) => a.id);
 
-  if (toDelete.length) {
-    await prisma.notificationAlert.deleteMany({ where: { id: { in: toDelete } } });
-  }
+    if (toDelete.length) {
+      await prisma.notificationAlert.deleteMany({ where: { id: { in: toDelete } } });
+    }
 
-  for (let i = 0; i < alerts.length; i++) {
-    const alert = alerts[i];
-    if (alert.id && keepIds.has(alert.id)) {
-      await prisma.notificationAlert.update({
-        where: { id: alert.id },
-        data: {
-          label: alert.label,
-          timeLocal: alert.timeLocal,
-          frequency: alert.frequency,
-          enabled: alert.enabled,
-          sortOrder: alert.sortOrder ?? i,
-        },
-      });
-    } else {
-      await prisma.notificationAlert.create({
-        data: {
-          label: alert.label,
-          timeLocal: alert.timeLocal,
-          frequency: alert.frequency,
-          enabled: alert.enabled,
-          sortOrder: alert.sortOrder ?? i,
-        },
-      });
+    for (let i = 0; i < alerts.length; i++) {
+      const alert = alerts[i];
+      if (alert.id && keepIds.has(alert.id)) {
+        await prisma.notificationAlert.update({
+          where: { id: alert.id },
+          data: {
+            label: alert.label,
+            timeLocal: alert.timeLocal,
+            frequency: alert.frequency,
+            enabled: alert.enabled,
+            sortOrder: alert.sortOrder ?? i,
+          },
+        });
+      } else {
+        await prisma.notificationAlert.create({
+          data: {
+            label: alert.label,
+            timeLocal: alert.timeLocal,
+            frequency: alert.frequency,
+            enabled: alert.enabled,
+            sortOrder: alert.sortOrder ?? i,
+          },
+        });
+      }
     }
   }
 

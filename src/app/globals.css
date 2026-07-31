@@ -193,3 +193,8 @@ textarea {
 .column-in {
   animation: column-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Hide Next.js Dev Tools (logo + issues badge). Errors still log to the terminal/console. */
+nextjs-portal {
+  display: none !important;
+}

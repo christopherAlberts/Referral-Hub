@@ -16,11 +16,14 @@ type Alert = {
 
 type Settings = {
   alerts: Alert[];
+  notifyBody: string;
   lastSentAt?: string | null;
   nextScheduledAt?: string | null;
   scheduleTimezone?: string;
   pushEnabledCount?: number;
 };
+
+const DEFAULT_NOTIFY_BODY = "Hi {{name}} — please update today’s patient capacity.";
 
 function blankAlert(): Alert {
   return {
@@ -46,9 +49,10 @@ function formatWhen(iso: string | null | undefined, timeZone?: string) {
   }
 }
 
-function serializeAlerts(alerts: Alert[]) {
-  return JSON.stringify(
-    alerts.map((a, i) => ({
+function serializeSettings(alerts: Alert[], notifyBody: string) {
+  return JSON.stringify({
+    notifyBody: notifyBody.trim(),
+    alerts: alerts.map((a, i) => ({
       id: a.id,
       label: a.label,
       timeLocal: a.timeLocal,
@@ -56,7 +60,7 @@ function serializeAlerts(alerts: Alert[]) {
       enabled: a.enabled,
       sortOrder: i,
     })),
-  );
+  });
 }
 
 export function AdminSettings() {
@@ -73,13 +77,14 @@ export function AdminSettings() {
   function applySettingsPayload(data: { settings: Settings }) {
     const next = {
       alerts: data.settings.alerts ?? [],
+      notifyBody: data.settings.notifyBody || DEFAULT_NOTIFY_BODY,
       lastSentAt: data.settings.lastSentAt ?? null,
       nextScheduledAt: data.settings.nextScheduledAt ?? null,
       scheduleTimezone: data.settings.scheduleTimezone,
       pushEnabledCount: data.settings.pushEnabledCount ?? 0,
     };
     setSettings(next);
-    lastSaved.current = serializeAlerts(next.alerts);
+    lastSaved.current = serializeSettings(next.alerts, next.notifyBody);
   }
 
   async function loadSettings(opts?: { quiet?: boolean }) {
@@ -109,8 +114,8 @@ export function AdminSettings() {
     }
   }
 
-  async function persistAlerts(alerts: Alert[]) {
-    const payload = serializeAlerts(alerts);
+  async function persistSettings(alerts: Alert[], notifyBody: string) {
+    const payload = serializeSettings(alerts, notifyBody);
     if (payload === lastSaved.current) return;
 
     setSaving(true);
@@ -120,6 +125,7 @@ export function AdminSettings() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          notifyBody: notifyBody.trim() || DEFAULT_NOTIFY_BODY,
           alerts: alerts.map((a, i) => ({
             id: a.id,
             label: a.label.trim() || "Capacity reminder",
@@ -145,11 +151,11 @@ export function AdminSettings() {
     }
   }
 
-  function queueSave(alerts: Alert[]) {
+  function queueSave(alerts: Alert[], notifyBody: string) {
     if (!hydrated.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      void persistAlerts(alerts);
+      void persistSettings(alerts, notifyBody);
     }, 450);
   }
 
@@ -159,11 +165,19 @@ export function AdminSettings() {
       const alerts = prev.alerts.map((a, i) => (i === index ? { ...a, ...patch } : a));
       if (immediate) {
         if (saveTimer.current) clearTimeout(saveTimer.current);
-        void persistAlerts(alerts);
+        void persistSettings(alerts, prev.notifyBody);
       } else {
-        queueSave(alerts);
+        queueSave(alerts, prev.notifyBody);
       }
       return { ...prev, alerts };
+    });
+  }
+
+  function updateNotifyBody(notifyBody: string) {
+    setSettings((prev) => {
+      if (!prev) return prev;
+      queueSave(prev.alerts, notifyBody);
+      return { ...prev, notifyBody };
     });
   }
 
@@ -172,7 +186,7 @@ export function AdminSettings() {
       if (!prev) return prev;
       const alerts = [...prev.alerts, blankAlert()];
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      void persistAlerts(alerts);
+      void persistSettings(alerts, prev.notifyBody);
       return { ...prev, alerts };
     });
   }
@@ -182,7 +196,7 @@ export function AdminSettings() {
       if (!prev) return prev;
       const alerts = prev.alerts.filter((_, i) => i !== index);
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      void persistAlerts(alerts);
+      void persistSettings(alerts, prev.notifyBody);
       return { ...prev, alerts };
     });
   }
@@ -233,7 +247,7 @@ export function AdminSettings() {
     return (
       <div className="glass mx-auto max-w-xl space-y-3 rounded-[28px] p-5">
         <p className="text-[var(--red)]">{error ?? "Could not load settings."}</p>
-        <button type="button" className="btn" onClick={loadSettings}>
+        <button type="button" className="btn" onClick={() => loadSettings()}>
           Retry
         </button>
       </div>
@@ -241,6 +255,10 @@ export function AdminSettings() {
   }
 
   const tz = settings.scheduleTimezone;
+  const previewBody = (settings.notifyBody.trim() || DEFAULT_NOTIFY_BODY).replaceAll(
+    "{{name}}",
+    "Frasier",
+  );
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -284,6 +302,33 @@ export function AdminSettings() {
               ? "No users have push enabled yet"
               : `${settings.pushEnabledCount} user${settings.pushEnabledCount === 1 ? "" : "s"} with push enabled`}
           </p>
+        </div>
+      </section>
+
+      <section className="glass space-y-3 rounded-[28px] p-5">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--ink)]">Message wording</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Used for scheduled alerts and “Send notification now!” for therapists. Include{" "}
+            <code className="rounded bg-white/70 px-1.5 py-0.5 text-xs">{"{{name}}"}</code> where
+            the therapist’s first name should appear.
+          </p>
+        </div>
+        <div className="field">
+          <label>Notification body</label>
+          <textarea
+            rows={3}
+            value={settings.notifyBody}
+            onChange={(e) => updateNotifyBody(e.target.value)}
+            placeholder={DEFAULT_NOTIFY_BODY}
+            maxLength={280}
+          />
+        </div>
+        <div className="rounded-2xl bg-white/50 p-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+            Preview
+          </p>
+          <p className="mt-1 text-[var(--ink)]">{previewBody}</p>
         </div>
       </section>
 

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { LogoMark } from "@/components/LogoMark";
 
 export function LoginForm() {
   const router = useRouter();
@@ -34,9 +35,12 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="glass w-full max-w-md space-y-4 rounded-[28px] p-6">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">
-          Referral Hub
-        </p>
+        <div className="flex items-center gap-2.5">
+          <LogoMark className="h-8 w-8 text-[var(--ink)]" />
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">
+            Referral Hub
+          </p>
+        </div>
         <h1 className="mt-2 text-3xl leading-tight" style={{ fontFamily: "var(--font-display)" }}>
           Sign in
         </h1>

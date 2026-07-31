@@ -94,6 +94,7 @@ model PushSubscription {
 model AppSettings {
   id               String    @id @default("default")
   notifyEnabled    Boolean   @default(true)
+  notifyBody       String    @default("Hi {{name}} — please update today’s patient capacity.")
   lastBroadcastAt  DateTime?
   updatedAt        DateTime  @updatedAt
 }

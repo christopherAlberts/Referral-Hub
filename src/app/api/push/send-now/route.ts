@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { DEFAULT_NOTIFY_BODY, formatNotifyBody, greetingName } from "@/lib/notify";
 import { sendPushToUser } from "@/lib/push";
 
 export async function POST() {
@@ -9,6 +10,11 @@ export async function POST() {
   if (!session?.user || session.user.role !== Role.ADMIN) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const appSettings =
+    (await prisma.appSettings.findUnique({ where: { id: "default" } })) ??
+    (await prisma.appSettings.create({ data: { id: "default" } }));
+  const notifyBody = appSettings.notifyBody || DEFAULT_NOTIFY_BODY;
 
   const users = await prisma.user.findMany({
     where: {
@@ -43,8 +49,8 @@ export async function POST() {
       title: "Referral Hub",
       body:
         user.role === Role.THERAPIST
-          ? `Hi ${user.name.split(" ")[0]} — please update today’s patient capacity now.`
-          : `Notification from Referral Hub for ${user.name.split(" ")[0]}.`,
+          ? formatNotifyBody(notifyBody, user.name)
+          : `Notification from Referral Hub for ${greetingName(user.name)}.`,
       url,
     });
 

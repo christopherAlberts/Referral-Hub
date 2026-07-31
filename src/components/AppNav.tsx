@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { LogoMark } from "@/components/LogoMark";
 import { PushCoach } from "@/components/PushCoach";
 
 const linksByRole: Record<string, { href: string; label: string }[]> = {
@@ -30,14 +31,17 @@ export function AppNav({ title }: { title: string }) {
     <>
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[rgba(232,238,245,0.82)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div>
-            <p
-              className="text-[1.35rem] leading-none tracking-tight text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Referral Hub
-            </p>
-            <p className="mt-1 text-xs text-[var(--muted)]">{title}</p>
+          <div className="flex items-center gap-2.5">
+            <LogoMark className="h-7 w-7 shrink-0 text-[var(--ink)]" />
+            <div>
+              <p
+                className="text-[1.35rem] leading-none tracking-tight text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Referral Hub
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">{title}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden text-sm text-[var(--muted)] sm:inline">

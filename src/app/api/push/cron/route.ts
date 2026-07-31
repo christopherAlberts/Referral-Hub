@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { NotifyFrequency, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { DEFAULT_NOTIFY_BODY, formatNotifyBody } from "@/lib/notify";
 import { sendPushToUser } from "@/lib/push";
 import {
   dateStringInTimezone,
@@ -32,6 +33,11 @@ export async function GET(req: Request) {
   if (!alerts.length) {
     return NextResponse.json({ ok: true, skipped: true, reason: "no_alerts" });
   }
+
+  const appSettings =
+    (await prisma.appSettings.findUnique({ where: { id: "default" } })) ??
+    (await prisma.appSettings.create({ data: { id: "default" } }));
+  const notifyBody = appSettings.notifyBody || DEFAULT_NOTIFY_BODY;
 
   const therapists = await prisma.user.findMany({
     where: { role: Role.THERAPIST, active: true },
@@ -108,7 +114,7 @@ export async function GET(req: Request) {
 
       const { sent, failed } = await sendPushToUser(therapist.id, {
         title: alert.label || "Capacity check-in",
-        body: `Hi ${therapist.name.split(" ")[0]} — please update today’s patient capacity.`,
+        body: formatNotifyBody(notifyBody, therapist.name),
         url: "/therapist",
       });
 
