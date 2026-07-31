@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Referral Hub
 
-## Getting Started
+Installable PWA for psychiatric referral teams. Therapists update daily capacity; psychiatrists see a live colored board; admins manage accounts and morning push reminder settings.
 
-First, run the development server:
+## Stack
+
+- Next.js (App Router) + TypeScript + Tailwind
+- Postgres + Prisma
+- Auth.js (credentials) with roles: `ADMIN`, `PSYCHIATRIST`, `THERAPIST`
+- Web Push (VAPID) via service worker — works on **Android Chrome** and **iOS 16.4+ Home Screen web apps**
+
+## Quick start
+
+1. Create a Postgres database (local example):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+createdb referral_hub
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Copy env and fill values:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Generate secrets:
 
-## Learn More
+```bash
+openssl rand -base64 32          # AUTH_SECRET
+npx web-push generate-vapid-keys # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
+```
 
-To learn more about Next.js, take a look at the following resources:
+Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the same value as `VAPID_PUBLIC_KEY`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Install, migrate, seed:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+npm run db:setup
+npm run dev
+```
 
-## Deploy on Vercel
+Open [http://localhost:3000](http://localhost:3000).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Test credentials
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@referralhub.test` | `Admin123!` |
+| Psychiatrist | `psych@referralhub.test` | `Psych123!` |
+| Therapist | `therapist@referralhub.test` | `Therapy123!` |
+
+Seed also creates popular fictional therapists (Frasier Crane, Jennifer Melfi, Sean Maguire, and more) with mixed capacity for today.
+
+## Roles
+
+- **Psychiatrist** — `/psychiatrist` board with 3-column / 1-column bubble views, search, sort, status filters
+- **Therapist** — `/therapist` daily capacity + `/therapist/profile` (avatar, details, timezone)
+- **Admin** — `/admin` user management + `/admin/settings` notification time & frequency
+
+## Push notifications (iOS + Android)
+
+### Android
+
+1. Open the site in Chrome
+2. Install when prompted (or use the in-app Install button)
+3. Tap **Enable notifications** and allow permission
+
+### iOS (critical)
+
+Web Push on iPhone/iPad only works when the app is added to the Home Screen:
+
+1. Open the site in **Safari**
+2. Share → **Add to Home Screen**
+3. Launch **Referral Hub** from the Home Screen icon (not a Safari tab)
+4. Tap **Enable notifications** and allow permission
+
+Reminders fire at the admin-configured clock time in **each therapist’s timezone**.
+
+### Cron
+
+`GET /api/push/cron` with header `Authorization: Bearer $CRON_SECRET` (or `?secret=`).
+
+On Vercel, `vercel.json` schedules this every 10 minutes. Set `CRON_SECRET` in project env (Vercel Cron sends it as Bearer automatically when configured).
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Postgres connection string |
+| `AUTH_SECRET` | Auth.js secret |
+| `AUTH_URL` | App origin (e.g. `http://localhost:3000`) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web Push |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Same as public VAPID key (browser) |
+| `CRON_SECRET` | Protects the reminder cron route |
+
+## Scripts
+
+```bash
+npm run dev        # local server
+npm run build      # production build
+npm run db:push    # sync Prisma schema
+npm run db:seed    # reset seed data
+npm run db:setup   # push + seed
+```

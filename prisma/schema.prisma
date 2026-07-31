@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PSYCHIATRIST
+  THERAPIST
+}
+
+enum CapacityStatus {
+  AVAILABLE
+  SOME_CAPACITY
+  NO_CAPACITY
+}
+
+enum NotifyFrequency {
+  DAILY
+  WEEKDAYS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  timezone     String   @default("Africa/Johannesburg")
+  avatarUrl    String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  therapistProfile   TherapistProfile?
+  pushSubscriptions  PushSubscription[]
+  dailyAvailabilities DailyAvailability[]
+  reminderLogs       ReminderLog[]
+}
+
+model TherapistProfile {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  specialty String?
+  bio       String?
+  phone     String?
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DailyAvailability {
+  id          String         @id @default(cuid())
+  therapistId String
+  date        DateTime       @db.Date
+  status      CapacityStatus
+  slots       Int?
+  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime       @default(now())
+  therapist   User           @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@unique([therapistId, date])
+  @@index([date])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AppSettings {
+  id              String          @id @default("default")
+  notifyEnabled   Boolean         @default(true)
+  notifyTimeLocal String          @default("08:00")
+  frequency       NotifyFrequency @default(DAILY)
+  updatedAt       DateTime        @updatedAt
+}
+
+model ReminderLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  sentAt    DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
