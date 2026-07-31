@@ -37,6 +37,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   therapistProfile    TherapistProfile?
+  psychiatristProfile PsychiatristProfile?
   pushSubscriptions   PushSubscription[]
   dailyAvailabilities DailyAvailability[]
   reminderLogs        ReminderLog[]
@@ -49,6 +50,19 @@ model TherapistProfile {
   bio       String?
   phone     String?
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PsychiatristProfile {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  title         String?
+  specialty     String?
+  phone         String?
+  secondaryPhone String?
+  clinic        String?
+  licenseNumber String?
+  bio           String?
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model DailyAvailability {

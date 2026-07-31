@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { AvatarPicker } from "@/components/AvatarPicker";
 import { COMMON_TIMEZONES } from "@/lib/timezone";
 
 type Profile = {
@@ -88,23 +89,12 @@ export function ProfileForm() {
       </section>
 
       <section className="glass space-y-4 rounded-[28px] p-5">
-        <div className="flex items-center gap-4">
-          <div className="h-20 w-20 overflow-hidden rounded-full bg-[var(--bg-deep)]">
-            {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : null}
-          </div>
-          <div className="field flex-1">
-            <label htmlFor="avatar">Profile image</label>
-            <input
-              id="avatar"
-              type="file"
-              accept="image/*"
-              onChange={(e) => onAvatarChange(e.target.files?.[0] ?? null)}
-            />
-          </div>
-        </div>
+        <AvatarPicker
+          name={profile.name}
+          avatarUrl={profile.avatarUrl}
+          onChange={(file) => onAvatarChange(file)}
+          onClear={() => setProfile({ ...profile, avatarUrl: null })}
+        />
 
         <div className="field">
           <label htmlFor="name">Name</label>

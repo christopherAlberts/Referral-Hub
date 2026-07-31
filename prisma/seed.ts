@@ -109,6 +109,7 @@ async function main() {
   await prisma.dailyAvailability.deleteMany();
   await prisma.pushSubscription.deleteMany();
   await prisma.therapistProfile.deleteMany();
+  await prisma.psychiatristProfile.deleteMany();
   await prisma.user.deleteMany();
   await prisma.appSettings.deleteMany();
 
@@ -156,6 +157,17 @@ async function main() {
       timezone: DEFAULT_TZ,
       passwordHash: await hash("Psych123!"),
       avatarUrl: null,
+      psychiatristProfile: {
+        create: {
+          title: "Consultant Psychiatrist",
+          specialty: "Diagnostic medicine & complex cases",
+          phone: "+1-609-555-0142",
+          secondaryPhone: "+1-609-555-0190",
+          clinic: "Princeton-Plainsboro Teaching Hospital",
+          licenseNumber: "MD-PPTH-1001",
+          bio: "Specializes in differential diagnosis and coordinating specialist referrals.",
+        },
+      },
     },
   });
 
