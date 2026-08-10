@@ -199,72 +199,86 @@ function CapacityTable({ therapists }: { therapists: TherapistBoardItem[] }) {
 
   return (
     <div className="glass column-in overflow-hidden rounded-[28px]">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left">
-          <thead>
-            <tr className="border-b border-[var(--line)] bg-white/50 text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
-              <th className="px-4 py-3.5 font-semibold sm:px-5">Psychologist</th>
-              <th className="px-3 py-3.5 text-center font-semibold" style={{ color: "var(--green)" }}>
-                Available
-              </th>
-              <th className="px-3 py-3.5 text-center font-semibold" style={{ color: "var(--amber)" }}>
-                Some capacity
-              </th>
-              <th className="px-3 py-3.5 text-center font-semibold" style={{ color: "var(--red)" }}>
-                No capacity
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {therapists.map((t, i) => {
-              const status = t.availability?.status ?? null;
-              const slots = t.availability?.slots;
-              return (
-                <tr
-                  key={t.id}
-                  className="rise-in border-b border-[var(--line)] last:border-b-0"
-                  style={{ animationDelay: `${i * 35}ms` }}
-                >
-                  <td className="px-4 py-3 sm:px-5">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
-                        style={{ background: "var(--ink)" }}
-                      >
-                        {t.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={t.avatarUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          initials(t.name)
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-[var(--ink)]">{t.name}</p>
-                        <p className="truncate text-xs text-[var(--muted)]">{t.specialty ?? "Therapist"}</p>
-                      </div>
+      <table className="w-full table-fixed border-collapse text-left">
+        <thead>
+          <tr className="border-b border-[var(--line)] bg-white/50 text-[10px] uppercase tracking-[0.06em] text-[var(--muted)] sm:text-xs sm:tracking-[0.08em]">
+            <th className="w-[40%] px-2 py-3 font-semibold sm:w-auto sm:px-5 sm:py-3.5">Therapist</th>
+            <th
+              className="w-[20%] px-1 py-3 text-center font-semibold sm:w-auto sm:px-3 sm:py-3.5"
+              style={{ color: "var(--green)" }}
+            >
+              <span className="sm:hidden">Avail</span>
+              <span className="hidden sm:inline">Available</span>
+            </th>
+            <th
+              className="w-[20%] px-1 py-3 text-center font-semibold sm:w-auto sm:px-3 sm:py-3.5"
+              style={{ color: "var(--amber)" }}
+            >
+              <span className="sm:hidden">Some</span>
+              <span className="hidden sm:inline">Some capacity</span>
+            </th>
+            <th
+              className="w-[20%] px-1 py-3 text-center font-semibold sm:w-auto sm:px-3 sm:py-3.5"
+              style={{ color: "var(--red)" }}
+            >
+              <span className="sm:hidden">None</span>
+              <span className="hidden sm:inline">No capacity</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {therapists.map((t, i) => {
+            const status = t.availability?.status ?? null;
+            const slots = t.availability?.slots;
+            return (
+              <tr
+                key={t.id}
+                className="rise-in border-b border-[var(--line)] last:border-b-0"
+                style={{ animationDelay: `${i * 35}ms` }}
+              >
+                <td className="px-2 py-2.5 sm:px-5 sm:py-3">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div
+                      className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white sm:h-9 sm:w-9 sm:text-xs"
+                      style={{ background: "var(--ink)" }}
+                    >
+                      {t.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={t.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        initials(t.name)
+                      )}
                     </div>
-                  </td>
-                  <StatusCell
-                    active={status === CapacityStatus.AVAILABLE}
-                    tone="green"
-                    value={status === CapacityStatus.AVAILABLE ? String(slots ?? "✓") : null}
-                  />
-                  <StatusCell
-                    active={status === CapacityStatus.SOME_CAPACITY}
-                    tone="amber"
-                    value={status === CapacityStatus.SOME_CAPACITY ? String(slots ?? "✓") : null}
-                  />
-                  <StatusCell
-                    active={status === CapacityStatus.NO_CAPACITY}
-                    tone="red"
-                    value={status === CapacityStatus.NO_CAPACITY ? "—" : null}
-                  />
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--ink)] sm:text-base">
+                        {t.name}
+                      </p>
+                      <p className="truncate text-[10px] text-[var(--muted)] sm:text-xs">
+                        {t.specialty ?? "Therapist"}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <StatusCell
+                  active={status === CapacityStatus.AVAILABLE}
+                  tone="green"
+                  value={status === CapacityStatus.AVAILABLE ? String(slots ?? "✓") : null}
+                />
+                <StatusCell
+                  active={status === CapacityStatus.SOME_CAPACITY}
+                  tone="amber"
+                  value={status === CapacityStatus.SOME_CAPACITY ? String(slots ?? "✓") : null}
+                />
+                <StatusCell
+                  active={status === CapacityStatus.NO_CAPACITY}
+                  tone="red"
+                  value={status === CapacityStatus.NO_CAPACITY ? "—" : null}
+                />
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -285,10 +299,10 @@ function StatusCell({
   }[tone];
 
   return (
-    <td className="px-3 py-3 text-center align-middle">
+    <td className="px-1 py-2.5 text-center align-middle sm:px-3 sm:py-3">
       {active ? (
         <span
-          className="inline-flex min-w-[3rem] items-center justify-center rounded-full px-3 py-1.5 text-sm font-bold"
+          className="inline-flex min-w-[1.75rem] items-center justify-center rounded-full px-1.5 py-1 text-xs font-bold sm:min-w-[3rem] sm:px-3 sm:py-1.5 sm:text-sm"
           style={{ background: styles.bg, color: styles.ink }}
         >
           {value}

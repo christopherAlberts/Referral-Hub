@@ -5,6 +5,8 @@ import { formatInTimeZone } from "date-fns-tz";
 const prisma = new PrismaClient();
 
 const DEFAULT_TZ = "Africa/Johannesburg";
+/** Seed capacity for today through this many months ahead (demo-ready board every day). */
+const DEMO_MONTHS_AHEAD = 3;
 
 async function hash(password: string) {
   return bcrypt.hash(password, 10);
@@ -180,6 +182,46 @@ const fictionalTherapists = [
 
 const seedTherapists = [...famousTherapists, ...fictionalTherapists];
 
+const STATUS_CYCLE = [
+  CapacityStatus.AVAILABLE,
+  CapacityStatus.SOME_CAPACITY,
+  CapacityStatus.AVAILABLE,
+  CapacityStatus.NO_CAPACITY,
+  CapacityStatus.AVAILABLE,
+  CapacityStatus.SOME_CAPACITY,
+] as const;
+
+function demoStatusForDay(
+  base: CapacityStatus,
+  dayIndex: number,
+  therapistIndex: number,
+): CapacityStatus {
+  // Keep ~1/3 of therapists on their signature status most days; rotate the rest
+  // so the psychiatrist board looks different each demo day.
+  if ((therapistIndex + dayIndex) % 5 === 0) {
+    return STATUS_CYCLE[(dayIndex + therapistIndex) % STATUS_CYCLE.length];
+  }
+  return base;
+}
+
+function demoSlots(status: CapacityStatus, dayIndex: number, therapistIndex: number): number | null {
+  if (status === CapacityStatus.NO_CAPACITY) return null;
+  if (status === CapacityStatus.SOME_CAPACITY) return ((dayIndex + therapistIndex) % 2) + 1;
+  return ((dayIndex + therapistIndex) % 4) + 2;
+}
+
+/** Calendar days as UTC-midnight Date values (matches todayInTimezone / Prisma @db.Date). */
+function demoDays(fromYmd: string): Date[] {
+  const [y, m, d] = fromYmd.split("-").map(Number);
+  const start = Date.UTC(y, m - 1, d);
+  const end = Date.UTC(y, m - 1 + DEMO_MONTHS_AHEAD, d);
+  const days: Date[] = [];
+  for (let t = start; t <= end; t += 24 * 60 * 60 * 1000) {
+    days.push(new Date(t));
+  }
+  return days;
+}
+
 async function main() {
   await prisma.reminderLog.deleteMany();
   await prisma.notificationAlert.deleteMany();
@@ -267,18 +309,26 @@ async function main() {
   });
 
   const todayStr = formatInTimeZone(new Date(), DEFAULT_TZ, "yyyy-MM-dd");
-  const today = new Date(`${todayStr}T00:00:00.000Z`);
+  const days = demoDays(todayStr);
 
-  await prisma.dailyAvailability.create({
-    data: {
+  const availabilityRows: {
+    therapistId: string;
+    date: Date;
+    status: CapacityStatus;
+    slots: number | null;
+  }[] = [];
+
+  for (const [dayIndex, day] of days.entries()) {
+    const status = demoStatusForDay(CapacityStatus.AVAILABLE, dayIndex, 0);
+    availabilityRows.push({
       therapistId: mainTherapist.id,
-      date: today,
-      status: CapacityStatus.AVAILABLE,
-      slots: 3,
-    },
-  });
+      date: day,
+      status,
+      slots: demoSlots(status, dayIndex, 0),
+    });
+  }
 
-  for (const t of seedTherapists) {
+  for (const [therapistIndex, t] of seedTherapists.entries()) {
     const user = await prisma.user.create({
       data: {
         email: t.email,
@@ -296,19 +346,32 @@ async function main() {
       },
     });
 
-    if (t.status) {
-      await prisma.dailyAvailability.create({
-        data: {
-          therapistId: user.id,
-          date: today,
-          status: t.status,
-          slots: t.slots,
-        },
+    if (!t.status) continue;
+
+    for (const [dayIndex, day] of days.entries()) {
+      const status = demoStatusForDay(t.status, dayIndex, therapistIndex + 1);
+      availabilityRows.push({
+        therapistId: user.id,
+        date: day,
+        status,
+        slots: demoSlots(status, dayIndex, therapistIndex + 1),
       });
     }
   }
 
+  // Batch inserts stay under typical Postgres parameter limits
+  const BATCH = 500;
+  for (let i = 0; i < availabilityRows.length; i += BATCH) {
+    await prisma.dailyAvailability.createMany({
+      data: availabilityRows.slice(i, i + BATCH),
+    });
+  }
+
+  const endStr = days[days.length - 1]?.toISOString().slice(0, 10) ?? todayStr;
   console.log("Seed complete.");
+  console.log(
+    `Capacity seeded for ${days.length} days (${todayStr} → ${endStr}) across ${1 + seedTherapists.filter((t) => t.status).length} therapists.`,
+  );
   console.log("Admin:        admin@referralhub.test / Admin123!");
   console.log("Psychiatrist: psych@referralhub.test / Psych123!");
   console.log("Therapist:    therapist@referralhub.test / Therapy123!");

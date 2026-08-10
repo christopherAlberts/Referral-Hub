@@ -34,7 +34,16 @@ export async function POST() {
   let recipients = 0;
   let sent = 0;
   let failed = 0;
-  const details: Array<{ name: string; role: Role; sent: number; failed: number }> = [];
+  let appleSent = 0;
+  let appleFailed = 0;
+  const details: Array<{
+    name: string;
+    role: Role;
+    sent: number;
+    failed: number;
+    appleSent: number;
+    appleFailed: number;
+  }> = [];
 
   for (const user of users) {
     recipients += 1;
@@ -56,7 +65,16 @@ export async function POST() {
 
     sent += result.sent;
     failed += result.failed;
-    details.push({ name: user.name, role: user.role, sent: result.sent, failed: result.failed });
+    appleSent += result.appleSent;
+    appleFailed += result.appleFailed;
+    details.push({
+      name: user.name,
+      role: user.role,
+      sent: result.sent,
+      failed: result.failed,
+      appleSent: result.appleSent,
+      appleFailed: result.appleFailed,
+    });
   }
 
   let lastBroadcastAt: string | null = null;
@@ -75,6 +93,8 @@ export async function POST() {
     recipients,
     sent,
     failed,
+    appleSent,
+    appleFailed,
     activeUserCount,
     pushEnabledCount: recipients,
     lastBroadcastAt,

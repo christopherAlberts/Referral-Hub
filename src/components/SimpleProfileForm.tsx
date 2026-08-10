@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AvatarPicker } from "@/components/AvatarPicker";
+import { enablePushNotifications } from "@/lib/push-client";
 import { COMMON_TIMEZONES } from "@/lib/timezone";
 
 type Profile = {
@@ -25,6 +26,7 @@ export function SimpleProfileForm() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -47,6 +49,19 @@ export function SimpleProfileForm() {
       )
       .catch(() => undefined);
   }, []);
+
+  async function onEnablePush() {
+    setEnablingPush(true);
+    setMessage(null);
+    const result = await enablePushNotifications();
+    if (result.ok) {
+      setProfile((prev) => (prev ? { ...prev, pushEnabled: true } : prev));
+      setMessage("Notifications enabled.");
+    } else {
+      setMessage(result.message);
+    }
+    setEnablingPush(false);
+  }
 
   async function onAvatarChange(file: File | null) {
     if (!file || !profile) return;
@@ -108,9 +123,23 @@ export function SimpleProfileForm() {
         <p className="mt-1 text-sm text-[var(--muted)]">
           Contact and practice details for your psychiatrist account.
         </p>
-        <p className="mt-2 text-xs text-[var(--muted)]">
-          Push: {profile.pushEnabled ? "enabled" : "not enabled yet"}
-        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-[var(--muted)]">
+            Push: {profile.pushEnabled ? "enabled" : "not enabled yet"}
+          </p>
+          <button
+            type="button"
+            className="btn !py-1.5 text-xs"
+            disabled={enablingPush}
+            onClick={onEnablePush}
+          >
+            {enablingPush
+              ? "Working…"
+              : profile.pushEnabled
+                ? "Refresh notifications"
+                : "Enable notifications"}
+          </button>
+        </div>
       </section>
 
       <section className="glass space-y-4 rounded-[28px] p-5">

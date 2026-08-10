@@ -1,0 +1,49 @@
+# Referral Hub — app :4001 (Cloudflare: referralhub.streblainnovations.com)
+# Postgres host port 5434 avoids conflict with Strebla / other stacks on 5432
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: referral_hub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: referral
+      POSTGRES_PASSWORD: referral
+      POSTGRES_DB: referral_hub
+    ports:
+      - "5434:5432"
+    volumes:
+      - referral_hub_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U referral -d referral_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    container_name: referral_hub_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "4001"
+      HOSTNAME: 0.0.0.0
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      # Override host .env so the app talks to the compose DB, not localhost
+      DATABASE_URL: postgresql://referral:referral@db:5432/referral_hub?schema=public
+      AUTH_URL: ${AUTH_URL:-https://referralhub.streblainnovations.com}
+    ports:
+      - "4001:4001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  referral_hub_postgres_data:

@@ -39,38 +39,52 @@ export async function GET() {
     include: {
       therapistProfile: true,
       pushSubscriptions: { select: { id: true } },
-      dailyAvailabilities: {
-        orderBy: { date: "desc" },
-        take: 1,
-      },
     },
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
 
-  return NextResponse.json({
-    users: users.map((u) => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      role: u.role,
-      timezone: u.timezone,
-      active: u.active,
-      avatarUrl: u.avatarUrl,
-      specialty: u.therapistProfile?.specialty ?? null,
-      bio: u.therapistProfile?.bio ?? null,
-      phone: u.therapistProfile?.phone ?? null,
-      pushEnabled: u.pushSubscriptions.length > 0,
-      lastAvailability: u.dailyAvailabilities[0]
-        ? {
-            date: u.dailyAvailabilities[0].date,
-            status: u.dailyAvailabilities[0].status,
-            slots: u.dailyAvailabilities[0].slots,
-            updatedAt: u.dailyAvailabilities[0].updatedAt,
-          }
-        : null,
-      todayDate: todayInTimezone(u.timezone),
-    })),
-  });
+  const todayByTz = new Map<string, Date>();
+  const rows = await Promise.all(
+    users.map(async (u) => {
+      let today = todayByTz.get(u.timezone);
+      if (!today) {
+        today = todayInTimezone(u.timezone);
+        todayByTz.set(u.timezone, today);
+      }
+
+      const todayAvailability =
+        u.role === Role.THERAPIST
+          ? await prisma.dailyAvailability.findUnique({
+              where: { therapistId_date: { therapistId: u.id, date: today } },
+            })
+          : null;
+
+      return {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        timezone: u.timezone,
+        active: u.active,
+        avatarUrl: u.avatarUrl,
+        specialty: u.therapistProfile?.specialty ?? null,
+        bio: u.therapistProfile?.bio ?? null,
+        phone: u.therapistProfile?.phone ?? null,
+        pushEnabled: u.pushSubscriptions.length > 0,
+        lastAvailability: todayAvailability
+          ? {
+              date: todayAvailability.date,
+              status: todayAvailability.status,
+              slots: todayAvailability.slots,
+              updatedAt: todayAvailability.updatedAt,
+            }
+          : null,
+        todayDate: today,
+      };
+    }),
+  );
+
+  return NextResponse.json({ users: rows });
 }
 
 export async function POST(req: Request) {

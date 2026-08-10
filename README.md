@@ -32,6 +32,8 @@ npx web-push generate-vapid-keys # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
 
 Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the same value as `VAPID_PUBLIC_KEY`.
 
+`VAPID_SUBJECT` must be a real `mailto:` or `https:` URL (Apple rejects reserved TLDs like `.test` with `BadJwtToken`).
+
 3. Install, migrate, seed:
 
 ```bash
@@ -50,7 +52,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | Psychiatrist | `psych@referralhub.test` | `Psych123!` |
 | Therapist | `therapist@referralhub.test` | `Therapy123!` |
 
-Seed also creates popular fictional therapists (Frasier Crane, Jennifer Melfi, Sean Maguire, and more) with mixed capacity for today.
+Seed also creates popular fictional therapists (Frasier Crane, Jennifer Melfi, Sean Maguire, and more) with mixed daily capacity for today through the next ~3 months so demos work without re-seeding.
 
 ## Roles
 

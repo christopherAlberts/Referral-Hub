@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Required for the production Docker image (smaller runtime)
+  output: "standalone",
   allowedDevOrigins: ["referralhub.streblainnovations.com"],
   // Hide the Next.js Dev Tools indicator in development
   devIndicators: false,

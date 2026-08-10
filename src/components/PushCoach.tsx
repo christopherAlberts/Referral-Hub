@@ -2,27 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import {
+  enablePushNotifications,
+  fetchPushEnabled,
+  isIosDevice,
+  isStandaloneDisplay,
+  registerPushServiceWorker,
+} from "@/lib/push-client";
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+const SNOOZE_KEY = "rh-push-snooze-until";
+const SNOOZE_MS = 1000 * 60 * 60 * 12; // 12 hours — not forever
+
+function isSnoozed() {
+  const until = Number(localStorage.getItem(SNOOZE_KEY) || "0");
+  return Number.isFinite(until) && until > Date.now();
 }
 
-function isIos() {
-  if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
-function isStandalone() {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    // @ts-expect-error iOS Safari
-    window.navigator.standalone === true
-  );
+function clearLegacyDismiss() {
+  // Old builds hid the coach forever after "Later". Clear that so phones recover.
+  localStorage.removeItem("rh-push-dismissed");
 }
 
 export function PushCoach() {
@@ -32,13 +30,13 @@ export function PushCoach() {
   const [busy, setBusy] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
 
-  const ios = useMemo(() => isIos(), []);
-  const standalone = useMemo(() => isStandalone(), []);
+  const ios = useMemo(() => isIosDevice(), []);
+  const standalone = useMemo(() => isStandaloneDisplay(), []);
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    const dismissed = localStorage.getItem("rh-push-dismissed");
-    if (dismissed === "1") return;
+
+    clearLegacyDismiss();
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -46,15 +44,51 @@ export function PushCoach() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    }
+    let cancelled = false;
 
-    const needsCoach =
-      Notification.permission !== "granted" || (ios && !standalone);
-    setOpen(needsCoach);
+    (async () => {
+      try {
+        await registerPushServiceWorker();
+      } catch {
+        // Banner can still offer enable; errors surface on tap.
+      }
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+      const serverEnabled = await fetchPushEnabled();
+      if (cancelled) return;
+
+      // Permission already granted but server has no subscription — fix silently.
+      if (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted" &&
+        serverEnabled === false &&
+        !(ios && !standalone)
+      ) {
+        const result = await enablePushNotifications();
+        if (cancelled) return;
+        if (result.ok) {
+          setOpen(false);
+          return;
+        }
+      }
+
+      const needsPermission =
+        typeof Notification === "undefined" || Notification.permission !== "granted";
+      const needsServer = serverEnabled !== true;
+      const needsIosInstall = ios && !standalone;
+      const needsCoach = needsPermission || needsServer || needsIosInstall;
+
+      if (!needsCoach) {
+        setOpen(false);
+        return;
+      }
+
+      setOpen(!isSnoozed());
+    })();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
   }, [status, ios, standalone]);
 
   if (status !== "authenticated" || !open || !session) return null;
@@ -62,52 +96,15 @@ export function PushCoach() {
   async function enableNotifications() {
     setBusy(true);
     setMessage(null);
-    try {
-      if (ios && !isStandalone()) {
-        setMessage("On iPhone, open Referral Hub from your Home Screen icon first, then tap Enable.");
-        setBusy(false);
-        return;
-      }
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        setMessage("Push is not supported in this browser context.");
-        setBusy(false);
-        return;
-      }
-
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setMessage("Notification permission was not granted.");
-        setBusy(false);
-        return;
-      }
-
-      const reg = await navigator.serviceWorker.ready;
-      const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!key) throw new Error("Missing VAPID public key");
-
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
-      });
-
-      const json = subscription.toJSON();
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: json.keys,
-        }),
-      });
-
+    const result = await enablePushNotifications();
+    if (result.ok) {
+      localStorage.removeItem(SNOOZE_KEY);
       setMessage("Notifications enabled. You’re all set.");
-      localStorage.setItem("rh-push-dismissed", "1");
       setTimeout(() => setOpen(false), 1200);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not enable notifications");
-    } finally {
-      setBusy(false);
+    } else {
+      setMessage(result.message);
     }
+    setBusy(false);
   }
 
   async function installAndroid() {
@@ -124,19 +121,19 @@ export function PushCoach() {
       <div className="glass rounded-[24px] p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold">Install & notifications</p>
+            <p className="text-sm font-semibold">Turn on notifications</p>
             <p className="mt-1 text-sm text-[var(--muted)]">
               {ios
                 ? standalone
-                  ? "Enable push so you get the morning capacity reminder."
+                  ? "Tap Enable so this phone can receive capacity reminders."
                   : "Add Referral Hub to your Home Screen (Share → Add to Home Screen), open it from the icon, then enable notifications."
-                : "Install the app and enable notifications for daily capacity reminders."}
+                : "Installing the app does not turn on alerts by itself. Tap Enable notifications — Android will ask for permission."}
             </p>
           </div>
           <button
             className="text-sm text-[var(--muted)]"
             onClick={() => {
-              localStorage.setItem("rh-push-dismissed", "1");
+              localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
               setOpen(false);
             }}
           >

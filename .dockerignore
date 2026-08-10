@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+*.log
+.env
+.env.local
+.env.*.local
+.vercel
+coverage
+tsconfig.tsbuildinfo
+README.md
+AGENTS.md
+CLAUDE.md
+vercel.json

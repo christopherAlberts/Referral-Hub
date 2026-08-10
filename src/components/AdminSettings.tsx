@@ -229,8 +229,12 @@ export function AdminSettings() {
           `Nothing sent — ${data.pushEnabledCount ?? 0} of ${data.activeUserCount ?? 0} users have push enabled. Open the app on a phone/browser, install it, and tap Enable notifications while logged in.`,
         );
       } else {
+        const applePart =
+          typeof data.appleSent === "number"
+            ? ` · iOS accepted ${data.appleSent}${data.appleFailed ? `, ${data.appleFailed} failed` : ""}`
+            : "";
         setMessage(
-          `Sent now to ${data.recipients} user${data.recipients === 1 ? "" : "s"} (${data.sent} delivery${data.sent === 1 ? "" : "ies"}${data.failed ? `, ${data.failed} failed` : ""}).`,
+          `Sent now to ${data.recipients} user${data.recipients === 1 ? "" : "s"} (${data.sent} delivery${data.sent === 1 ? "" : "ies"}${data.failed ? `, ${data.failed} failed` : ""}${applePart}).`,
         );
       }
       await loadSettings({ quiet: true });
