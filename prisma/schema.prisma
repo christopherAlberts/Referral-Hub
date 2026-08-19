@@ -44,12 +44,19 @@ model User {
 }
 
 model TherapistProfile {
-  id        String  @id @default(cuid())
-  userId    String  @unique
-  specialty String?
-  bio       String?
-  phone     String?
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  specialty          String?
+  hospital           String?
+  ageGroups          String[] @default([])
+  gender             String?
+  languages          String[] @default([])
+  areasOfPractice    String[] @default([])
+  offersAssessments  Boolean?
+  assessmentTypes    String[] @default([])
+  bio                String?
+  phone              String?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PsychiatristProfile {
@@ -92,11 +99,23 @@ model PushSubscription {
 }
 
 model AppSettings {
-  id               String    @id @default("default")
-  notifyEnabled    Boolean   @default(true)
-  notifyBody       String    @default("Hi {{name}} — please update today’s patient capacity.")
-  lastBroadcastAt  DateTime?
-  updatedAt        DateTime  @updatedAt
+  id                          String    @id @default("default")
+  notifyEnabled               Boolean   @default(true)
+  notifyBody                  String    @default("Hi {{name}} — please update today’s patient capacity.")
+  psychiatristDefaultView     String    @default("table")
+  psychiatristShowViewOptions Boolean   @default(false)
+  psychiatristBoardFilters    Json      @default("[]")
+  hpcsaCategories             Json      @default("[\"Clinical Psychologist\",\"Counselling Psychologist\",\"Educational Psychologist\",\"Neuropsychologist\"]")
+  psychiatristProfileFields   Json      @default("[]")
+  therapistProfileFields      Json      @default("[]")
+  hospitalSettings            Json      @default("[\"Neuro Clinic - George\",\"Akeso - George\"]")
+  ageGroupOptions             Json      @default("[]")
+  genderOptions               Json      @default("[]")
+  languageOptions             Json      @default("[]")
+  practiceAreaOptions         Json      @default("[]")
+  assessmentTypeOptions       Json      @default("[]")
+  lastBroadcastAt             DateTime?
+  updatedAt                   DateTime  @updatedAt
 }
 
 model NotificationAlert {

@@ -3,6 +3,7 @@ import { CapacityStatus, Role } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isPsychiatristViewMode, parseTherapistOptionLists, normalizePsychiatristBoardFilters } from "@/lib/therapist-fields";
 import { dateStringInTimezone, todayInTimezone } from "@/lib/timezone";
 
 const schema = z.object({
@@ -45,6 +46,13 @@ export async function GET() {
           avatarUrl: t.avatarUrl,
           timezone: t.timezone,
           specialty: t.therapistProfile?.specialty ?? null,
+          hospital: t.therapistProfile?.hospital ?? null,
+          ageGroups: t.therapistProfile?.ageGroups ?? [],
+          gender: t.therapistProfile?.gender ?? null,
+          languages: t.therapistProfile?.languages ?? [],
+          areasOfPractice: t.therapistProfile?.areasOfPractice ?? [],
+          offersAssessments: t.therapistProfile?.offersAssessments ?? null,
+          assessmentTypes: t.therapistProfile?.assessmentTypes ?? [],
           bio: t.therapistProfile?.bio ?? null,
           phone: t.therapistProfile?.phone ?? null,
           availability: availability
@@ -58,7 +66,21 @@ export async function GET() {
       }),
     );
 
-    return NextResponse.json({ therapists: rows });
+    const appSettings =
+      (await prisma.appSettings.findUnique({ where: { id: "default" } })) ??
+      (await prisma.appSettings.create({ data: { id: "default" } }));
+
+    return NextResponse.json({
+      therapists: rows,
+      boardSettings: {
+        defaultView: isPsychiatristViewMode(appSettings.psychiatristDefaultView)
+          ? appSettings.psychiatristDefaultView
+          : "table",
+        showViewOptions: appSettings.psychiatristShowViewOptions,
+        filters: normalizePsychiatristBoardFilters(appSettings.psychiatristBoardFilters),
+        optionLists: parseTherapistOptionLists(appSettings),
+      },
+    });
   }
 
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });

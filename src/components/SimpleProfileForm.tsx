@@ -4,6 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AvatarPicker } from "@/components/AvatarPicker";
 import { enablePushNotifications } from "@/lib/push-client";
+import {
+  normalizePsychiatristProfileFields,
+  psychiatristFieldMap,
+  type PsychiatristProfileFieldSetting,
+} from "@/lib/therapist-fields";
 import { COMMON_TIMEZONES } from "@/lib/timezone";
 
 type Profile = {
@@ -21,9 +26,16 @@ type Profile = {
   pushEnabled: boolean;
 };
 
+function fieldLabel(field: PsychiatristProfileFieldSetting) {
+  return field.required ? `${field.label} *` : field.label;
+}
+
 export function SimpleProfileForm() {
   const { update } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [fields, setFields] = useState<PsychiatristProfileFieldSetting[]>(() =>
+    normalizePsychiatristProfileFields([]),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
@@ -31,7 +43,7 @@ export function SimpleProfileForm() {
   useEffect(() => {
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((data) =>
+      .then((data) => {
         setProfile({
           name: data.name ?? "",
           email: data.email ?? "",
@@ -45,8 +57,9 @@ export function SimpleProfileForm() {
           licenseNumber: data.licenseNumber ?? null,
           bio: data.bio ?? null,
           pushEnabled: Boolean(data.pushEnabled),
-        }),
-      )
+        });
+        setFields(normalizePsychiatristProfileFields(data.psychiatristProfileFields));
+      })
       .catch(() => undefined);
   }, []);
 
@@ -79,6 +92,15 @@ export function SimpleProfileForm() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!profile) return;
+    const byId = psychiatristFieldMap(fields);
+    if (byId.name.visible && byId.name.required && !profile.name.trim()) {
+      setMessage("Please enter your full name.");
+      return;
+    }
+    if (byId.whatsapp.visible && byId.whatsapp.required && !profile.phone?.trim()) {
+      setMessage("Please enter a preferred number for WhatsApp communication.");
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const res = await fetch("/api/profile", {
@@ -99,7 +121,8 @@ export function SimpleProfileForm() {
     });
     setSaving(false);
     if (!res.ok) {
-      setMessage("Could not save profile.");
+      const data = await res.json().catch(() => ({}));
+      setMessage(typeof data.error === "string" ? data.error : "Could not save profile.");
       return;
     }
     await update({
@@ -113,6 +136,10 @@ export function SimpleProfileForm() {
   }
 
   if (!profile) return <p className="text-[var(--muted)]">Loading profile…</p>;
+
+  const byId = psychiatristFieldMap(fields);
+  const showWhatsapp = byId.whatsapp.visible;
+  const showSecondary = byId.secondaryPhone.visible;
 
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-xl space-y-4">
@@ -143,117 +170,149 @@ export function SimpleProfileForm() {
       </section>
 
       <section className="glass space-y-4 rounded-[28px] p-5">
-        <AvatarPicker
-          name={profile.name}
-          avatarUrl={profile.avatarUrl}
-          onChange={(file) => onAvatarChange(file)}
-          onClear={() => setProfile({ ...profile, avatarUrl: null })}
-        />
-
-        <div className="field">
-          <label htmlFor="name">Full name</label>
-          <input
-            id="name"
-            value={profile.name}
-            onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            required
+        {byId.avatar.visible && (
+          <AvatarPicker
+            name={profile.name}
+            avatarUrl={profile.avatarUrl}
+            onChange={(file) => onAvatarChange(file)}
+            onClear={() => setProfile({ ...profile, avatarUrl: null })}
           />
-        </div>
+        )}
 
-        <div className="field">
-          <label htmlFor="title">Title</label>
-          <input
-            id="title"
-            placeholder="e.g. Consultant Psychiatrist"
-            value={profile.title ?? ""}
-            onChange={(e) => setProfile({ ...profile, title: e.target.value })}
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={profile.email} disabled readOnly />
-          <p className="text-xs text-[var(--muted)]">Email is managed by an admin.</p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
+        {byId.name.visible && (
           <div className="field">
-            <label htmlFor="phone">Phone number</label>
+            <label htmlFor="name">{fieldLabel(byId.name)}</label>
             <input
-              id="phone"
-              type="tel"
-              placeholder="+27 …"
-              value={profile.phone ?? ""}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              id="name"
+              value={profile.name}
+              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              required={byId.name.required}
             />
           </div>
+        )}
+
+        {byId.title.visible && (
           <div className="field">
-            <label htmlFor="secondaryPhone">Secondary number</label>
+            <label htmlFor="title">{fieldLabel(byId.title)}</label>
             <input
-              id="secondaryPhone"
-              type="tel"
+              id="title"
+              placeholder="e.g. Consultant Psychiatrist"
+              value={profile.title ?? ""}
+              onChange={(e) => setProfile({ ...profile, title: e.target.value })}
+              required={byId.title.required}
+            />
+          </div>
+        )}
+
+        {byId.email.visible && (
+          <div className="field">
+            <label htmlFor="email">{fieldLabel(byId.email)}</label>
+            <input id="email" type="email" value={profile.email} disabled readOnly />
+            <p className="text-xs text-[var(--muted)]">Email is managed by an admin.</p>
+          </div>
+        )}
+
+        {(showWhatsapp || showSecondary) && (
+          <div className={`grid gap-3 ${showWhatsapp && showSecondary ? "sm:grid-cols-2" : ""}`}>
+            {showWhatsapp && (
+              <div className="field">
+                <label htmlFor="phone">{fieldLabel(byId.whatsapp)}</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  placeholder="+27 …"
+                  value={profile.phone ?? ""}
+                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                  required={byId.whatsapp.required}
+                />
+              </div>
+            )}
+            {showSecondary && (
+              <div className="field">
+                <label htmlFor="secondaryPhone">{fieldLabel(byId.secondaryPhone)}</label>
+                <input
+                  id="secondaryPhone"
+                  type="tel"
+                  placeholder="Optional"
+                  value={profile.secondaryPhone ?? ""}
+                  onChange={(e) => setProfile({ ...profile, secondaryPhone: e.target.value })}
+                  required={byId.secondaryPhone.required}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {byId.specialty.visible && (
+          <div className="field">
+            <label htmlFor="specialty">{fieldLabel(byId.specialty)}</label>
+            <input
+              id="specialty"
+              placeholder="e.g. Adult psychiatry, Mood disorders"
+              value={profile.specialty ?? ""}
+              onChange={(e) => setProfile({ ...profile, specialty: e.target.value })}
+              required={byId.specialty.required}
+            />
+          </div>
+        )}
+
+        {byId.clinic.visible && (
+          <div className="field">
+            <label htmlFor="clinic">{fieldLabel(byId.clinic)}</label>
+            <input
+              id="clinic"
+              placeholder="Practice or hospital name"
+              value={profile.clinic ?? ""}
+              onChange={(e) => setProfile({ ...profile, clinic: e.target.value })}
+              required={byId.clinic.required}
+            />
+          </div>
+        )}
+
+        {byId.licenseNumber.visible && (
+          <div className="field">
+            <label htmlFor="licenseNumber">{fieldLabel(byId.licenseNumber)}</label>
+            <input
+              id="licenseNumber"
               placeholder="Optional"
-              value={profile.secondaryPhone ?? ""}
-              onChange={(e) => setProfile({ ...profile, secondaryPhone: e.target.value })}
+              value={profile.licenseNumber ?? ""}
+              onChange={(e) => setProfile({ ...profile, licenseNumber: e.target.value })}
+              required={byId.licenseNumber.required}
             />
           </div>
-        </div>
+        )}
 
-        <div className="field">
-          <label htmlFor="specialty">Specialty</label>
-          <input
-            id="specialty"
-            placeholder="e.g. Adult psychiatry, Mood disorders"
-            value={profile.specialty ?? ""}
-            onChange={(e) => setProfile({ ...profile, specialty: e.target.value })}
-          />
-        </div>
+        {byId.timezone.visible && (
+          <div className="field">
+            <label htmlFor="timezone">{fieldLabel(byId.timezone)}</label>
+            <select
+              id="timezone"
+              value={profile.timezone}
+              onChange={(e) => setProfile({ ...profile, timezone: e.target.value })}
+              required={byId.timezone.required}
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        <div className="field">
-          <label htmlFor="clinic">Clinic / practice</label>
-          <input
-            id="clinic"
-            placeholder="Practice or hospital name"
-            value={profile.clinic ?? ""}
-            onChange={(e) => setProfile({ ...profile, clinic: e.target.value })}
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="licenseNumber">License / registration number</label>
-          <input
-            id="licenseNumber"
-            placeholder="Optional"
-            value={profile.licenseNumber ?? ""}
-            onChange={(e) => setProfile({ ...profile, licenseNumber: e.target.value })}
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="timezone">Timezone</label>
-          <select
-            id="timezone"
-            value={profile.timezone}
-            onChange={(e) => setProfile({ ...profile, timezone: e.target.value })}
-          >
-            {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label htmlFor="bio">Bio / notes</label>
-          <textarea
-            id="bio"
-            rows={4}
-            placeholder="Short professional bio"
-            value={profile.bio ?? ""}
-            onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-          />
-        </div>
+        {byId.bio.visible && (
+          <div className="field">
+            <label htmlFor="bio">{fieldLabel(byId.bio)}</label>
+            <textarea
+              id="bio"
+              rows={4}
+              placeholder="Short professional bio"
+              value={profile.bio ?? ""}
+              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+              required={byId.bio.required}
+            />
+          </div>
+        )}
       </section>
 
       <button className="btn" disabled={saving}>

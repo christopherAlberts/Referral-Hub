@@ -1,13 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CapacityStatus } from "@prisma/client";
 import { TherapistBubble, type TherapistBoardItem } from "@/components/TherapistBubble";
+import {
+  hospitalLabel,
+  isPsychiatristViewMode,
+  matchesAgeGroupFilter,
+  mergeUniqueOptions,
+  normalizePsychiatristBoardFilters,
+  parseTherapistOptionLists,
+  psychiatristBoardFilterMap,
+  PSYCHIATRIST_VIEWS,
+  type PsychiatristBoardFilterSetting,
+  type PsychiatristViewMode,
+  type TherapistOptionLists,
+} from "@/lib/therapist-fields";
 import { initials } from "@/lib/utils";
 
 type StatusFilter = "ALL" | CapacityStatus | "NONE";
 type SortDir = "asc" | "desc";
-type ViewMode = "table" | "three" | "one";
+type AssessmentOfferFilter = "ALL" | "YES" | "NO";
+
+type BoardSettings = {
+  defaultView: PsychiatristViewMode;
+  showViewOptions: boolean;
+  filters: PsychiatristBoardFilterSetting[];
+  optionLists: TherapistOptionLists;
+};
+
+const EMPTY_OPTION_LISTS = parseTherapistOptionLists({});
+const DEFAULT_FILTERS = normalizePsychiatristBoardFilters(null);
 
 export function PsychiatristBoard() {
   const [therapists, setTherapists] = useState<TherapistBoardItem[]>([]);
@@ -16,13 +39,45 @@ export function PsychiatristBoard() {
   const [sort, setSort] = useState<SortDir>("asc");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [specialty, setSpecialty] = useState("ALL");
-  const [view, setView] = useState<ViewMode>("table");
+  const [hospital, setHospital] = useState("ALL");
+  const [ageGroup, setAgeGroup] = useState("ALL");
+  const [gender, setGender] = useState("ALL");
+  const [language, setLanguage] = useState("ALL");
+  const [areaOfPractice, setAreaOfPractice] = useState("ALL");
+  const [assessmentOffer, setAssessmentOffer] = useState<AssessmentOfferFilter>("ALL");
+  const [assessmentType, setAssessmentType] = useState("ALL");
+  const [view, setView] = useState<PsychiatristViewMode>("table");
+  const [boardSettings, setBoardSettings] = useState<BoardSettings>({
+    defaultView: "table",
+    showViewOptions: false,
+    filters: DEFAULT_FILTERS,
+    optionLists: EMPTY_OPTION_LISTS,
+  });
+  const viewHydrated = useRef(false);
+  const show = psychiatristBoardFilterMap(boardSettings.filters);
+
+  function applyBoardSettings(next: BoardSettings) {
+    setBoardSettings(next);
+    if (!next.showViewOptions || !viewHydrated.current) {
+      setView(next.defaultView);
+      viewHydrated.current = true;
+    }
+  }
 
   async function load() {
     const res = await fetch("/api/availability", { cache: "no-store" });
     if (!res.ok) return;
     const data = await res.json();
     setTherapists(data.therapists ?? []);
+    const defaultView = isPsychiatristViewMode(data.boardSettings?.defaultView)
+      ? data.boardSettings.defaultView
+      : "table";
+    applyBoardSettings({
+      defaultView,
+      showViewOptions: Boolean(data.boardSettings?.showViewOptions),
+      filters: normalizePsychiatristBoardFilters(data.boardSettings?.filters),
+      optionLists: parseTherapistOptionLists(data.boardSettings?.optionLists ?? {}),
+    });
     setLoading(false);
   }
 
@@ -32,37 +87,129 @@ export function PsychiatristBoard() {
     return () => clearInterval(id);
   }, []);
 
-  const specialties = useMemo(() => {
-    const set = new Set<string>();
-    therapists.forEach((t) => {
-      if (t.specialty) set.add(t.specialty);
-    });
-    return Array.from(set).sort();
-  }, [therapists]);
+  const specialties = useMemo(
+    () => mergeUniqueOptions(boardSettings.optionLists.hpcsaCategories, therapists.map((t) => t.specialty)),
+    [therapists, boardSettings.optionLists.hpcsaCategories],
+  );
+
+  const hospitals = useMemo(
+    () => mergeUniqueOptions(boardSettings.optionLists.hospitalSettings, therapists.map((t) => t.hospital)),
+    [therapists, boardSettings.optionLists.hospitalSettings],
+  );
+
+  const ageGroups = useMemo(
+    () =>
+      mergeUniqueOptions(
+        boardSettings.optionLists.ageGroupOptions,
+        therapists.flatMap((t) => t.ageGroups ?? []),
+      ),
+    [therapists, boardSettings.optionLists.ageGroupOptions],
+  );
+
+  const genders = useMemo(
+    () => mergeUniqueOptions(boardSettings.optionLists.genderOptions, therapists.map((t) => t.gender)),
+    [therapists, boardSettings.optionLists.genderOptions],
+  );
+
+  const languages = useMemo(
+    () =>
+      mergeUniqueOptions(
+        boardSettings.optionLists.languageOptions,
+        therapists.flatMap((t) => t.languages ?? []),
+      ),
+    [therapists, boardSettings.optionLists.languageOptions],
+  );
+
+  const practiceAreas = useMemo(
+    () =>
+      mergeUniqueOptions(
+        boardSettings.optionLists.practiceAreaOptions,
+        therapists.flatMap((t) => t.areasOfPractice ?? []),
+      ),
+    [therapists, boardSettings.optionLists.practiceAreaOptions],
+  );
+
+  const assessmentTypes = useMemo(
+    () =>
+      mergeUniqueOptions(
+        boardSettings.optionLists.assessmentTypeOptions,
+        therapists.flatMap((t) => t.assessmentTypes ?? []),
+      ),
+    [therapists, boardSettings.optionLists.assessmentTypeOptions],
+  );
 
   const filtered = useMemo(() => {
     let rows = [...therapists];
-    if (query.trim()) {
+    if (show.search.visible && query.trim()) {
       const q = query.toLowerCase();
-      rows = rows.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          (t.specialty ?? "").toLowerCase().includes(q),
+      rows = rows.filter((t) =>
+        [
+          t.name,
+          t.specialty,
+          hospitalLabel(t.hospital),
+          t.gender,
+          ...(t.ageGroups ?? []),
+          ...(t.languages ?? []),
+          ...(t.areasOfPractice ?? []),
+          ...(t.assessmentTypes ?? []),
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(q)),
       );
     }
-    if (specialty !== "ALL") {
+    if (show.hpcsa.visible && specialty !== "ALL") {
       rows = rows.filter((t) => t.specialty === specialty);
     }
-    if (status === "NONE") {
-      rows = rows.filter((t) => !t.availability);
-    } else if (status !== "ALL") {
-      rows = rows.filter((t) => t.availability?.status === status);
+    if (show.hospital.visible && hospital !== "ALL") {
+      rows = rows.filter((t) => t.hospital === hospital);
     }
-    rows.sort((a, b) =>
-      sort === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name),
-    );
+    if (show.status.visible) {
+      if (status === "NONE") {
+        rows = rows.filter((t) => !t.availability);
+      } else if (status !== "ALL") {
+        rows = rows.filter((t) => t.availability?.status === status);
+      }
+    }
+    if (show.ageGroups.visible && ageGroup !== "ALL") {
+      rows = rows.filter((t) => matchesAgeGroupFilter(t.ageGroups, ageGroup));
+    }
+    if (show.gender.visible && gender !== "ALL") {
+      rows = rows.filter((t) => t.gender === gender);
+    }
+    if (show.languages.visible && language !== "ALL") {
+      rows = rows.filter((t) => t.languages?.includes(language));
+    }
+    if (show.areasOfPractice.visible && areaOfPractice !== "ALL") {
+      rows = rows.filter((t) => t.areasOfPractice?.includes(areaOfPractice));
+    }
+    if (show.assessments.visible) {
+      if (assessmentOffer === "YES") {
+        rows = rows.filter((t) => t.offersAssessments === true);
+      } else if (assessmentOffer === "NO") {
+        rows = rows.filter((t) => t.offersAssessments === false);
+      }
+      if (assessmentOffer !== "NO" && assessmentType !== "ALL") {
+        rows = rows.filter((t) => t.assessmentTypes?.includes(assessmentType));
+      }
+    }
+    const dir = show.sort.visible ? sort : "asc";
+    rows.sort((a, b) => (dir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
     return rows;
-  }, [therapists, query, sort, status, specialty]);
+  }, [
+    therapists,
+    query,
+    sort,
+    status,
+    specialty,
+    hospital,
+    ageGroup,
+    gender,
+    language,
+    areaOfPractice,
+    assessmentOffer,
+    assessmentType,
+    show,
+  ]);
 
   const columns = {
     AVAILABLE: filtered.filter((t) => t.availability?.status === CapacityStatus.AVAILABLE),
@@ -71,74 +218,232 @@ export function PsychiatristBoard() {
     NONE: filtered.filter((t) => !t.availability),
   };
 
+  const hasFilterBar =
+    Object.values(show).some((filter) => filter.visible) || boardSettings.showViewOptions;
+
   return (
     <div className="space-y-5">
+      {hasFilterBar && (
       <section className="glass rounded-[28px] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="field max-w-md flex-1">
-            <label htmlFor="search">Search</label>
-            <input
-              id="search"
-              placeholder="Find a psychologist…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+        {(show.search.visible || show.sort.visible || boardSettings.showViewOptions) && (
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            {show.search.visible ? (
+              <div className="field max-w-md flex-1">
+                <label htmlFor="search">Search</label>
+                <input
+                  id="search"
+                  placeholder="Find a psychologist…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+            <div className="flex flex-wrap gap-2">
+              {boardSettings.showViewOptions &&
+                PSYCHIATRIST_VIEWS.map((option) => (
+                  <button
+                    key={option.id}
+                    className="chip"
+                    data-active={view === option.id ? "true" : "false"}
+                    onClick={() => setView(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              {show.sort.visible && (
+                <button
+                  className="chip"
+                  data-active={sort === "asc" ? "true" : "false"}
+                  onClick={() => setSort(sort === "asc" ? "desc" : "asc")}
+                >
+                  {sort === "asc" ? "A → Z" : "Z → A"}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="chip" data-active={view === "table" ? "true" : "false"} onClick={() => setView("table")}>
-              Table
-            </button>
-            <button className="chip" data-active={view === "three" ? "true" : "false"} onClick={() => setView("three")}>
-              3 columns
-            </button>
-            <button className="chip" data-active={view === "one" ? "true" : "false"} onClick={() => setView("one")}>
-              1 column
-            </button>
+        )}
+
+        {show.status.visible && (
+          <div className={`${show.search.visible || show.sort.visible || boardSettings.showViewOptions ? "mt-4" : ""} flex flex-wrap gap-2`}>
+            {(
+              [
+                ["ALL", "All"],
+                [CapacityStatus.AVAILABLE, "Available"],
+                [CapacityStatus.SOME_CAPACITY, "Some capacity"],
+                [CapacityStatus.NO_CAPACITY, "No capacity"],
+                ["NONE", "Not updated"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className="chip"
+                data-active={status === value ? "true" : "false"}
+                onClick={() => setStatus(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {show.hospital.visible && (
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               className="chip"
-              data-active={sort === "asc" ? "true" : "false"}
-              onClick={() => setSort(sort === "asc" ? "desc" : "asc")}
+              data-active={hospital === "ALL" ? "true" : "false"}
+              onClick={() => setHospital("ALL")}
             >
-              {sort === "asc" ? "A → Z" : "Z → A"}
+              All hospitals
             </button>
+            {hospitals.map((option) => (
+              <button
+                key={option}
+                className="chip"
+                data-active={hospital === option ? "true" : "false"}
+                onClick={() => setHospital(option)}
+              >
+                {option}
+              </button>
+            ))}
           </div>
-        </div>
+        )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {(
-            [
-              ["ALL", "All"],
-              [CapacityStatus.AVAILABLE, "Available"],
-              [CapacityStatus.SOME_CAPACITY, "Some capacity"],
-              [CapacityStatus.NO_CAPACITY, "No capacity"],
-              ["NONE", "Not updated"],
-            ] as const
-          ).map(([value, label]) => (
+        {show.gender.visible && genders.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
-              key={value}
               className="chip"
-              data-active={status === value ? "true" : "false"}
-              onClick={() => setStatus(value)}
+              data-active={gender === "ALL" ? "true" : "false"}
+              onClick={() => setGender("ALL")}
             >
-              {label}
+              All genders
             </button>
-          ))}
-        </div>
+            {genders.map((option) => (
+              <button
+                key={option}
+                className="chip"
+                data-active={gender === option ? "true" : "false"}
+                onClick={() => setGender(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {specialties.length > 0 && (
-          <div className="mt-3 field max-w-xs">
-            <label htmlFor="specialty">Specialty</label>
-            <select id="specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
-              <option value="ALL">All specialties</option>
-              {specialties.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+        {show.languages.visible && languages.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              className="chip"
+              data-active={language === "ALL" ? "true" : "false"}
+              onClick={() => setLanguage("ALL")}
+            >
+              All languages
+            </button>
+            {languages.map((option) => (
+              <button
+                key={option}
+                className="chip"
+                data-active={language === option ? "true" : "false"}
+                onClick={() => setLanguage(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {show.assessments.visible && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                ["ALL", "All assessments"],
+                ["YES", "Offers assessments"],
+                ["NO", "No assessments"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className="chip"
+                data-active={assessmentOffer === value ? "true" : "false"}
+                onClick={() => setAssessmentOffer(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {(show.hpcsa.visible ||
+          show.ageGroups.visible ||
+          show.areasOfPractice.visible ||
+          (show.assessments.visible && assessmentOffer !== "NO")) && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {show.hpcsa.visible && (
+              <div className="field">
+                <label htmlFor="specialty">HPCSA Registration Category</label>
+                <select id="specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
+                  <option value="ALL">All categories</option>
+                  {specialties.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {show.ageGroups.visible && (
+              <div className="field">
+                <label htmlFor="ageGroup">Preferred patient age groups</label>
+                <select id="ageGroup" value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)}>
+                    <option value="ALL">Any age group</option>
+                  {ageGroups.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {show.areasOfPractice.visible && (
+              <div className="field">
+                <label htmlFor="areaOfPractice">Areas of practice</label>
+                <select
+                  id="areaOfPractice"
+                  value={areaOfPractice}
+                  onChange={(e) => setAreaOfPractice(e.target.value)}
+                >
+                  <option value="ALL">All areas</option>
+                  {practiceAreas.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {show.assessments.visible && assessmentOffer !== "NO" && (
+              <div className="field">
+                <label htmlFor="assessmentType">Assessment type</label>
+                <select
+                  id="assessmentType"
+                  value={assessmentType}
+                  onChange={(e) => setAssessmentType(e.target.value)}
+                >
+                  <option value="ALL">All types</option>
+                  {assessmentTypes.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
       </section>
+      )}
 
       {loading ? (
         <p className="text-[var(--muted)]">Loading board…</p>
@@ -230,6 +535,7 @@ function CapacityTable({ therapists }: { therapists: TherapistBoardItem[] }) {
           {therapists.map((t, i) => {
             const status = t.availability?.status ?? null;
             const slots = t.availability?.slots;
+            const hospital = hospitalLabel(t.hospital);
             return (
               <tr
                 key={t.id}
@@ -254,7 +560,7 @@ function CapacityTable({ therapists }: { therapists: TherapistBoardItem[] }) {
                         {t.name}
                       </p>
                       <p className="truncate text-[10px] text-[var(--muted)] sm:text-xs">
-                        {t.specialty ?? "Therapist"}
+                        {[t.specialty ?? "Therapist", hospital].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                   </div>

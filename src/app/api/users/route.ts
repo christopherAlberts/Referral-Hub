@@ -13,6 +13,7 @@ const createSchema = z.object({
   timezone: z.string().min(1),
   password: z.string().min(8),
   specialty: z.string().optional(),
+  hospital: z.string().optional(),
   bio: z.string().optional(),
   phone: z.string().optional(),
 });
@@ -24,6 +25,7 @@ const updateSchema = z.object({
   active: z.boolean().optional(),
   password: z.string().min(8).optional(),
   specialty: z.string().nullable().optional(),
+  hospital: z.string().nullable().optional(),
   bio: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   avatarUrl: z.string().nullable().optional(),
@@ -68,6 +70,7 @@ export async function GET() {
         active: u.active,
         avatarUrl: u.avatarUrl,
         specialty: u.therapistProfile?.specialty ?? null,
+        hospital: u.therapistProfile?.hospital ?? null,
         bio: u.therapistProfile?.bio ?? null,
         phone: u.therapistProfile?.phone ?? null,
         pushEnabled: u.pushSubscriptions.length > 0,
@@ -116,6 +119,7 @@ export async function POST(req: Request) {
             therapistProfile: {
               create: {
                 specialty: data.specialty,
+                hospital: data.hospital,
                 bio: data.bio,
                 phone: data.phone,
               },
@@ -140,23 +144,25 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { id, password, specialty, bio, phone, ...rest } = parsed.data;
+  const { id, password, specialty, hospital, bio, phone, ...rest } = parsed.data;
   const user = await prisma.user.update({
     where: { id },
     data: {
       ...rest,
       ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}),
-      ...(specialty !== undefined || bio !== undefined || phone !== undefined
+      ...(specialty !== undefined || hospital !== undefined || bio !== undefined || phone !== undefined
         ? {
             therapistProfile: {
               upsert: {
                 create: {
                   specialty: specialty ?? undefined,
+                  hospital: hospital ?? undefined,
                   bio: bio ?? undefined,
                   phone: phone ?? undefined,
                 },
                 update: {
                   specialty: specialty ?? undefined,
+                  hospital: hospital ?? undefined,
                   bio: bio ?? undefined,
                   phone: phone ?? undefined,
                 },

@@ -1,6 +1,7 @@
 "use client";
 
 import { CapacityStatus } from "@prisma/client";
+import { hospitalLabel } from "@/lib/therapist-fields";
 import { initials } from "@/lib/utils";
 
 export type TherapistBoardItem = {
@@ -8,6 +9,13 @@ export type TherapistBoardItem = {
   name: string;
   avatarUrl?: string | null;
   specialty?: string | null;
+  hospital?: string | null;
+  ageGroups?: string[];
+  gender?: string | null;
+  languages?: string[];
+  areasOfPractice?: string[];
+  offersAssessments?: boolean | null;
+  assessmentTypes?: string[];
   availability: {
     status: CapacityStatus;
     slots: number | null;
@@ -75,7 +83,11 @@ export function TherapistBubble({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold text-[var(--ink)]">{therapist.name}</p>
-        <p className="truncate text-xs text-[var(--muted)]">{therapist.specialty ?? "Therapist"}</p>
+        <p className="truncate text-xs text-[var(--muted)]">
+          {[therapist.specialty ?? "Therapist", hospitalLabel(therapist.hospital)]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
       </div>
       <div className="shrink-0 text-right">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: t.ink }}>

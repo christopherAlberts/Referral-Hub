@@ -15,7 +15,7 @@ export default async function PsychiatristPage() {
             Who’s open today
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Live therapist capacity — table, three-column board, or single list.
+            Live therapist capacity for today.
           </p>
         </div>
         <PsychiatristBoard />

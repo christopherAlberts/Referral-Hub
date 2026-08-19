@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Role } from "@prisma/client";
+import { hospitalLabel, parseHpcsaCategories, parseHospitalSettings } from "@/lib/therapist-fields";
 import { COMMON_TIMEZONES } from "@/lib/timezone";
 import { statusLabel } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ type UserRow = {
   timezone: string;
   active: boolean;
   specialty: string | null;
+  hospital: string | null;
   pushEnabled: boolean;
   lastAvailability: {
     date: string;
@@ -33,6 +35,7 @@ const emptyForm = {
   timezone: "Africa/Johannesburg",
   password: "",
   specialty: "",
+  hospital: "",
   bio: "",
   phone: "",
 };
@@ -46,6 +49,8 @@ export function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("ALL");
   const [pushFilter, setPushFilter] = useState<PushFilter>("ALL");
+  const [hpcsaCategories, setHpcsaCategories] = useState<string[]>(() => parseHpcsaCategories(null));
+  const [hospitalSettings, setHospitalSettings] = useState<string[]>(() => parseHospitalSettings(null));
 
   async function load() {
     const res = await fetch("/api/users");
@@ -56,6 +61,17 @@ export function AdminUsers() {
 
   useEffect(() => {
     load();
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.settings?.hpcsaCategories) {
+          setHpcsaCategories(parseHpcsaCategories(data.settings.hpcsaCategories));
+        }
+        if (data.settings?.hospitalSettings) {
+          setHospitalSettings(parseHospitalSettings(data.settings.hospitalSettings));
+        }
+      })
+      .catch(() => undefined);
   }, []);
 
   const filtered = useMemo(() => {
@@ -67,6 +83,7 @@ export function AdminUsers() {
           u.name.toLowerCase().includes(q) ||
           u.email.toLowerCase().includes(q) ||
           (u.specialty ?? "").toLowerCase().includes(q) ||
+          (hospitalLabel(u.hospital) ?? "").toLowerCase().includes(q) ||
           u.timezone.toLowerCase().includes(q),
       );
     }
@@ -85,7 +102,11 @@ export function AdminUsers() {
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        specialty: form.specialty || undefined,
+        hospital: form.hospital || undefined,
+      }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -172,13 +193,36 @@ export function AdminUsers() {
           />
         </div>
         {form.role === Role.THERAPIST && (
-          <div className="field">
-            <label>Specialty</label>
-            <input
-              value={form.specialty}
-              onChange={(e) => setForm({ ...form, specialty: e.target.value })}
-            />
-          </div>
+          <>
+            <div className="field">
+              <label>HPCSA Registration Category</label>
+              <select
+                value={form.specialty}
+                onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+              >
+                <option value="">Select a category</option>
+                {hpcsaCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Hospital</label>
+              <select
+                value={form.hospital}
+                onChange={(e) => setForm({ ...form, hospital: e.target.value })}
+              >
+                <option value="">Select a hospital</option>
+                {hospitalSettings.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
         <div className="md:col-span-2">
           <button className="btn" disabled={busy}>
@@ -194,7 +238,7 @@ export function AdminUsers() {
             <label htmlFor="user-search">Search users</label>
             <input
               id="user-search"
-              placeholder="Name, email, specialty, timezone…"
+              placeholder="Name, email, category, hospital, timezone…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -282,6 +326,7 @@ export function AdminUsers() {
                   <p className="mt-1 text-xs uppercase tracking-wide text-[var(--muted)]">
                     {user.role} · {user.timezone}
                     {user.specialty ? ` · ${user.specialty}` : ""}
+                    {user.hospital ? ` · ${hospitalLabel(user.hospital)}` : ""}
                     {!user.active ? " · inactive" : ""}
                   </p>
                 </div>

@@ -16,7 +16,8 @@ const famousTherapists = [
   {
     name: "Sigmund Freud",
     email: "sigmund.freud@referralhub.test",
-    specialty: "Psychoanalysis",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Founder of psychoanalysis; explores the unconscious through free association and dream work.",
     phone: "+43-1-555-0201",
     status: CapacityStatus.SOME_CAPACITY,
@@ -25,7 +26,8 @@ const famousTherapists = [
   {
     name: "Carl Jung",
     email: "carl.jung@referralhub.test",
-    specialty: "Analytical Psychology",
+    specialty: "Counselling Psychologist",
+    hospital: "Neuro Clinic - George",
     bio: "Depth psychologist focused on archetypes, individuation, and the collective unconscious.",
     phone: "+41-61-555-0202",
     status: CapacityStatus.AVAILABLE,
@@ -34,7 +36,8 @@ const famousTherapists = [
   {
     name: "Carl Rogers",
     email: "carl.rogers@referralhub.test",
-    specialty: "Person-Centered Therapy",
+    specialty: "Counselling Psychologist",
+    hospital: "Akeso - George",
     bio: "Humanistic clinician emphasizing empathy, congruence, and unconditional positive regard.",
     phone: "+1-312-555-0203",
     status: CapacityStatus.AVAILABLE,
@@ -43,7 +46,8 @@ const famousTherapists = [
   {
     name: "Virginia Satir",
     email: "virginia.satir@referralhub.test",
-    specialty: "Family Systems Therapy",
+    specialty: "Educational Psychologist",
+    hospital: "Akeso - George",
     bio: "Pioneer of family therapy known for transforming communication patterns in families.",
     phone: "+1-415-555-0204",
     status: CapacityStatus.SOME_CAPACITY,
@@ -52,7 +56,8 @@ const famousTherapists = [
   {
     name: "Irvin Yalom",
     email: "irvin.yalom@referralhub.test",
-    specialty: "Existential Psychotherapy",
+    specialty: "Clinical Psychologist",
+    hospital: "Neuro Clinic - George",
     bio: "Group and existential therapist exploring meaning, mortality, and authentic connection.",
     phone: "+1-650-555-0205",
     status: CapacityStatus.AVAILABLE,
@@ -61,7 +66,8 @@ const famousTherapists = [
   {
     name: "Aaron Beck",
     email: "aaron.beck@referralhub.test",
-    specialty: "Cognitive Behavioral Therapy",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Developer of CBT; helps clients identify and reframe unhelpful thought patterns.",
     phone: "+1-215-555-0206",
     status: CapacityStatus.SOME_CAPACITY,
@@ -70,7 +76,8 @@ const famousTherapists = [
   {
     name: "Viktor Frankl",
     email: "viktor.frankl@referralhub.test",
-    specialty: "Logotherapy",
+    specialty: "Counselling Psychologist",
+    hospital: "Akeso - George",
     bio: "Existential therapist focused on finding meaning even in difficult circumstances.",
     phone: "+43-1-555-0207",
     status: CapacityStatus.AVAILABLE,
@@ -79,7 +86,8 @@ const famousTherapists = [
   {
     name: "Fritz Perls",
     email: "fritz.perls@referralhub.test",
-    specialty: "Gestalt Therapy",
+    specialty: "Clinical Psychologist",
+    hospital: "Neuro Clinic - George",
     bio: "Gestalt practitioner emphasizing awareness, present-moment experience, and ownership.",
     phone: "+1-212-555-0208",
     status: CapacityStatus.NO_CAPACITY,
@@ -91,7 +99,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Frasier Crane",
     email: "frasier.crane@referralhub.test",
-    specialty: "Psychiatry & Talk Radio",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Harvard-trained psychiatrist with a passion for fine wine and finer insight.",
     phone: "+1-206-555-0101",
     status: CapacityStatus.AVAILABLE,
@@ -100,7 +109,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Sean Maguire",
     email: "sean.maguire@referralhub.test",
-    specialty: "Psychology & Trauma",
+    specialty: "Counselling Psychologist",
+    hospital: "Neuro Clinic - George",
     bio: "Boston psychologist who believes healing starts with honest conversation.",
     phone: "+1-617-555-0102",
     status: CapacityStatus.SOME_CAPACITY,
@@ -109,7 +119,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Jennifer Melfi",
     email: "jennifer.melfi@referralhub.test",
-    specialty: "Psychoanalysis",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Thoughtful analyst specializing in complex personality dynamics.",
     phone: "+1-973-555-0103",
     status: CapacityStatus.AVAILABLE,
@@ -118,7 +129,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Hannibal Lecter",
     email: "hannibal.lecter@referralhub.test",
-    specialty: "Forensic Psychiatry",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Renowned for precise observation. Prefers quiet mornings.",
     phone: "+1-301-555-0104",
     status: CapacityStatus.NO_CAPACITY,
@@ -127,7 +139,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Spencer Reid",
     email: "spencer.reid@referralhub.test",
-    specialty: "Behavioral Analysis",
+    specialty: "Neuropsychologist",
+    hospital: "Neuro Clinic - George",
     bio: "Encyclopedic mind focused on patterns of human behavior.",
     phone: "+1-202-555-0105",
     status: CapacityStatus.SOME_CAPACITY,
@@ -136,7 +149,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Tobias Fünke",
     email: "tobias.funke@referralhub.test",
-    specialty: "Analrapy (Family Systems)",
+    specialty: "Counselling Psychologist",
+    hospital: "Akeso - George",
     bio: "Never-nude practitioner of unconventional family therapy.",
     phone: "+1-949-555-0106",
     status: null,
@@ -145,7 +159,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Niles Crane",
     email: "niles.crane@referralhub.test",
-    specialty: "Psychiatry",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Refined clinician with exacting standards and excellent taste.",
     phone: "+1-206-555-0107",
     status: CapacityStatus.AVAILABLE,
@@ -154,7 +169,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Shaun Murphy",
     email: "shaun.murphy@referralhub.test",
-    specialty: "Clinical Counseling",
+    specialty: "Educational Psychologist",
+    hospital: "Neuro Clinic - George",
     bio: "Detail-oriented counselor who notices what others miss.",
     phone: "+1-415-555-0108",
     status: CapacityStatus.SOME_CAPACITY,
@@ -163,7 +179,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Lilith Sternin",
     email: "lilith.sternin@referralhub.test",
-    specialty: "Clinical Psychology",
+    specialty: "Clinical Psychologist",
+    hospital: "Akeso - George",
     bio: "Research-driven clinician with a direct communication style.",
     phone: "+1-617-555-0109",
     status: CapacityStatus.NO_CAPACITY,
@@ -172,7 +189,8 @@ const fictionalTherapists = [
   {
     name: "Dr. Paul Weston",
     email: "paul.weston@referralhub.test",
-    specialty: "Psychotherapy",
+    specialty: "Counselling Psychologist",
+    hospital: "Akeso - George",
     bio: "Empathetic therapist specializing in long-term relational work.",
     phone: "+1-212-555-0110",
     status: CapacityStatus.AVAILABLE,
@@ -181,6 +199,59 @@ const fictionalTherapists = [
 ];
 
 const seedTherapists = [...famousTherapists, ...fictionalTherapists];
+
+const AGE_GROUPS = [
+  "Children: 6–11 years",
+  "Adolescents: 12–17 years",
+  "Young adults: 18–25 years",
+  "Adults: 26–64 years",
+  "Older adults: 65 years and older",
+];
+const GENDERS = ["Female", "Male", "Other"];
+const PRACTICE_AREAS = [
+  "Anxiety and OCD",
+  "Depression and mood difficulties",
+  "Trauma, grief and adjustment",
+  "ADHD, autism and neurodiversity",
+  "Learning, school and behavioural difficulties",
+  "Emotional regulation and personality difficulties",
+  "Psychosis and complex mental health",
+  "Substance use and addiction",
+  "Eating, body-image and health-related difficulties",
+  "Relationships, couples and families",
+  "Sexuality, gender identity and affirmative support",
+  "Work stress and burnout",
+  "Cognitive and neuropsychological difficulties",
+];
+const ASSESSMENT_TYPES = [
+  "Clinical and diagnostic assessment",
+  "ADHD assessment",
+  "Autism and developmental assessment",
+  "Cognitive and intellectual assessment",
+  "Psychoeducational and learning assessment",
+  "Neuropsychological assessment",
+];
+
+function demoProfileFields(index: number) {
+  const offersAssessments = index % 3 !== 1;
+  return {
+    gender: GENDERS[index % GENDERS.length],
+    ageGroups:
+      index % 4 === 0
+        ? ["All age groups"]
+        : [AGE_GROUPS[index % AGE_GROUPS.length], AGE_GROUPS[(index + 2) % AGE_GROUPS.length]],
+    languages: index % 2 === 0 ? ["English"] : ["Afrikaans", "English"],
+    areasOfPractice: [
+      PRACTICE_AREAS[index % PRACTICE_AREAS.length],
+      PRACTICE_AREAS[(index + 3) % PRACTICE_AREAS.length],
+      PRACTICE_AREAS[(index + 7) % PRACTICE_AREAS.length],
+    ],
+    offersAssessments,
+    assessmentTypes: offersAssessments
+      ? [ASSESSMENT_TYPES[index % ASSESSMENT_TYPES.length], ASSESSMENT_TYPES[(index + 1) % ASSESSMENT_TYPES.length]]
+      : [],
+  };
+}
 
 const STATUS_CYCLE = [
   CapacityStatus.AVAILABLE,
@@ -237,6 +308,15 @@ async function main() {
       id: "default",
       notifyEnabled: true,
       notifyBody: "Hi {{name}} — please update today’s patient capacity.",
+      psychiatristDefaultView: "table",
+      psychiatristShowViewOptions: false,
+      hpcsaCategories: [
+        "Clinical Psychologist",
+        "Counselling Psychologist",
+        "Educational Psychologist",
+        "Neuropsychologist",
+      ],
+      hospitalSettings: ["Neuro Clinic - George", "Akeso - George"],
     },
   });
 
@@ -300,9 +380,11 @@ async function main() {
       passwordHash: await hash("Therapy123!"),
       therapistProfile: {
         create: {
-          specialty: "General Counseling",
+          specialty: "Counselling Psychologist",
+          hospital: "Neuro Clinic - George",
           bio: "Practical therapist who keeps sessions grounded and useful.",
           phone: "+1-212-555-0199",
+          ...demoProfileFields(0),
         },
       },
     },
@@ -339,8 +421,10 @@ async function main() {
         therapistProfile: {
           create: {
             specialty: t.specialty,
+            hospital: t.hospital,
             bio: t.bio,
             phone: t.phone,
+            ...demoProfileFields(therapistIndex + 1),
           },
         },
       },

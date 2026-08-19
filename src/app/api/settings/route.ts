@@ -4,6 +4,21 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DEFAULT_NOTIFY_BODY } from "@/lib/notify";
+import {
+  isPsychiatristViewMode,
+  normalizePsychiatristBoardFilters,
+  normalizePsychiatristProfileFields,
+  normalizeTherapistProfileFields,
+  parseHpcsaCategories,
+  parseTherapistOptionLists,
+  parseOptionList,
+  DEFAULT_AGE_GROUPS,
+  DEFAULT_ASSESSMENT_TYPES,
+  DEFAULT_GENDERS,
+  DEFAULT_HOSPITAL_SETTINGS,
+  DEFAULT_LANGUAGES,
+  DEFAULT_PRACTICE_AREAS,
+} from "@/lib/therapist-fields";
 import { nextAlertOccurrence, SCHEDULE_DISPLAY_TZ } from "@/lib/timezone";
 
 const alertSchema = z.object({
@@ -15,9 +30,81 @@ const alertSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
+const profileFieldSchema = z.object({
+  id: z.enum([
+    "name",
+    "email",
+    "whatsapp",
+    "avatar",
+    "title",
+    "secondaryPhone",
+    "specialty",
+    "clinic",
+    "licenseNumber",
+    "timezone",
+    "bio",
+  ]),
+  visible: z.boolean(),
+  required: z.boolean(),
+});
+
+const therapistFieldSchema = z.object({
+  id: z.enum([
+    "name",
+    "email",
+    "phone",
+    "avatar",
+    "timezone",
+    "bio",
+    "hpcsa",
+    "hospital",
+    "ageGroups",
+    "gender",
+    "languages",
+    "areasOfPractice",
+    "assessments",
+  ]),
+  visible: z.boolean(),
+  required: z.boolean(),
+});
+
+const optionListSchema = z.array(z.string().min(1).max(160)).min(1).max(40);
+
 const schema = z.object({
   alerts: z.array(alertSchema).min(0).max(20).optional(),
   notifyBody: z.string().min(1).max(280).optional(),
+  psychiatristDefaultView: z.enum(["table", "three", "one"]).optional(),
+  psychiatristShowViewOptions: z.boolean().optional(),
+  hpcsaCategories: optionListSchema.optional(),
+  psychiatristProfileFields: z.array(profileFieldSchema).min(1).max(20).optional(),
+  therapistProfileFields: z.array(therapistFieldSchema).min(1).max(20).optional(),
+  hospitalSettings: optionListSchema.optional(),
+  ageGroupOptions: optionListSchema.optional(),
+  genderOptions: optionListSchema.optional(),
+  languageOptions: optionListSchema.optional(),
+  practiceAreaOptions: optionListSchema.optional(),
+  assessmentTypeOptions: optionListSchema.optional(),
+  psychiatristBoardFilters: z
+    .array(
+      z.object({
+        id: z.enum([
+          "search",
+          "sort",
+          "status",
+          "hpcsa",
+          "hospital",
+          "ageGroups",
+          "gender",
+          "languages",
+          "areasOfPractice",
+          "assessments",
+        ]),
+        visible: z.boolean(),
+      }),
+    )
+    .min(1)
+    .max(20)
+    .optional(),
 });
 
 async function buildSettingsPayload() {
@@ -75,6 +162,14 @@ async function buildSettingsPayload() {
   return {
     ...settings,
     notifyBody: settings.notifyBody || DEFAULT_NOTIFY_BODY,
+    psychiatristDefaultView: isPsychiatristViewMode(settings.psychiatristDefaultView)
+      ? settings.psychiatristDefaultView
+      : "table",
+    psychiatristShowViewOptions: settings.psychiatristShowViewOptions,
+    psychiatristBoardFilters: normalizePsychiatristBoardFilters(settings.psychiatristBoardFilters),
+    psychiatristProfileFields: normalizePsychiatristProfileFields(settings.psychiatristProfileFields),
+    therapistProfileFields: normalizeTherapistProfileFields(settings.therapistProfileFields),
+    ...parseTherapistOptionLists(settings),
     lastBroadcastAt: settings.lastBroadcastAt?.toISOString() ?? null,
     lastSentAt: lastSentAt?.toISOString() ?? null,
     nextScheduledAt: upcoming[0] ?? null,
@@ -86,7 +181,7 @@ async function buildSettingsPayload() {
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user || (session.user.role !== Role.ADMIN && session.user.role !== Role.THERAPIST)) {
+  if (!session?.user || (session.user.role !== Role.ADMIN && session.user.role !== Role.THERAPIST && session.user.role !== Role.PSYCHIATRIST)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -105,7 +200,22 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { alerts, notifyBody } = parsed.data;
+  const {
+    alerts,
+    notifyBody,
+    psychiatristDefaultView,
+    psychiatristShowViewOptions,
+    psychiatristBoardFilters,
+    hpcsaCategories,
+    psychiatristProfileFields,
+    therapistProfileFields,
+    hospitalSettings,
+    ageGroupOptions,
+    genderOptions,
+    languageOptions,
+    practiceAreaOptions,
+    assessmentTypeOptions,
+  } = parsed.data;
 
   await prisma.appSettings.upsert({
     where: { id: "default" },
@@ -113,10 +223,60 @@ export async function PATCH(req: Request) {
       id: "default",
       notifyEnabled: true,
       notifyBody: notifyBody?.trim() || DEFAULT_NOTIFY_BODY,
+      psychiatristDefaultView: psychiatristDefaultView ?? "table",
+      psychiatristShowViewOptions: psychiatristShowViewOptions ?? false,
+      psychiatristBoardFilters: psychiatristBoardFilters
+        ? normalizePsychiatristBoardFilters(psychiatristBoardFilters)
+        : undefined,
+      hpcsaCategories: hpcsaCategories ? parseHpcsaCategories(hpcsaCategories) : undefined,
+      psychiatristProfileFields: psychiatristProfileFields
+        ? normalizePsychiatristProfileFields(psychiatristProfileFields)
+        : undefined,
+      therapistProfileFields: therapistProfileFields
+        ? normalizeTherapistProfileFields(therapistProfileFields)
+        : undefined,
+      hospitalSettings: hospitalSettings ? parseOptionList(hospitalSettings, DEFAULT_HOSPITAL_SETTINGS) : undefined,
+      ageGroupOptions: ageGroupOptions ? parseOptionList(ageGroupOptions, DEFAULT_AGE_GROUPS) : undefined,
+      genderOptions: genderOptions ? parseOptionList(genderOptions, DEFAULT_GENDERS) : undefined,
+      languageOptions: languageOptions ? parseOptionList(languageOptions, DEFAULT_LANGUAGES) : undefined,
+      practiceAreaOptions: practiceAreaOptions
+        ? parseOptionList(practiceAreaOptions, DEFAULT_PRACTICE_AREAS)
+        : undefined,
+      assessmentTypeOptions: assessmentTypeOptions
+        ? parseOptionList(assessmentTypeOptions, DEFAULT_ASSESSMENT_TYPES)
+        : undefined,
     },
     update: {
       notifyEnabled: true,
       ...(notifyBody !== undefined ? { notifyBody: notifyBody.trim() || DEFAULT_NOTIFY_BODY } : {}),
+      ...(psychiatristDefaultView !== undefined ? { psychiatristDefaultView } : {}),
+      ...(psychiatristShowViewOptions !== undefined ? { psychiatristShowViewOptions } : {}),
+      ...(psychiatristBoardFilters !== undefined
+        ? { psychiatristBoardFilters: normalizePsychiatristBoardFilters(psychiatristBoardFilters) }
+        : {}),
+      ...(hpcsaCategories !== undefined ? { hpcsaCategories: parseHpcsaCategories(hpcsaCategories) } : {}),
+      ...(psychiatristProfileFields !== undefined
+        ? { psychiatristProfileFields: normalizePsychiatristProfileFields(psychiatristProfileFields) }
+        : {}),
+      ...(therapistProfileFields !== undefined
+        ? { therapistProfileFields: normalizeTherapistProfileFields(therapistProfileFields) }
+        : {}),
+      ...(hospitalSettings !== undefined
+        ? { hospitalSettings: parseOptionList(hospitalSettings, DEFAULT_HOSPITAL_SETTINGS) }
+        : {}),
+      ...(ageGroupOptions !== undefined
+        ? { ageGroupOptions: parseOptionList(ageGroupOptions, DEFAULT_AGE_GROUPS) }
+        : {}),
+      ...(genderOptions !== undefined ? { genderOptions: parseOptionList(genderOptions, DEFAULT_GENDERS) } : {}),
+      ...(languageOptions !== undefined
+        ? { languageOptions: parseOptionList(languageOptions, DEFAULT_LANGUAGES) }
+        : {}),
+      ...(practiceAreaOptions !== undefined
+        ? { practiceAreaOptions: parseOptionList(practiceAreaOptions, DEFAULT_PRACTICE_AREAS) }
+        : {}),
+      ...(assessmentTypeOptions !== undefined
+        ? { assessmentTypeOptions: parseOptionList(assessmentTypeOptions, DEFAULT_ASSESSMENT_TYPES) }
+        : {}),
     },
   });
 
